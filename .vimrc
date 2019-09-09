@@ -26,6 +26,8 @@ Plugin 'airblade/vim-gitgutter'
 
 Plugin 'jiangmiao/auto-pairs'
 
+Plugin 'leafgarland/typescript-vim'
+
 call vundle#end()            " required
 filetype plugin indent on" required
 " ####################### Vundle stop #######################
@@ -118,7 +120,7 @@ autocmd FileType toml setlocal ts=2 sts=2 sw=2 expandtab
 au BufNewFile,BufRead Jenkinsfile setf groovy " Jenkinsfile syntax on
 
 set background=dark
-colorscheme material 
+colorscheme material
 
 if (has("nvim"))
   "For Neovim 0.1.3 and 0.1.4 < https://github.com/neovim/neovim/pull/2198 >
