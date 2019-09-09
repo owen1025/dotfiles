@@ -5,8 +5,14 @@ BASEDIR=$(dirname "$0")
 # Install a brew
 /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 
-# Install a zsh
-brew update && brew install zsh
+# Brew update 
+brew update
+
+# install mas
+brew install mas
+
+# install all client
+brew bundle
 
 # Install a oh-my-zsh
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh)"
@@ -14,39 +20,8 @@ sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/mas
 # Install a antigen
 curl -L git.io/antigen > "${HOME}/antigen.zsh"
 
-# Install a fzf
-brew install fzf
 # To install useful key bindings and fuzzy completion:
 $(brew --prefix)/opt/fzf/install
-
-# Install a git
-brew install git pcre
-
-# Install a fasd
-brew install fasd
-
-# Install a tmux
-brew install tmux
-
-# Install a neofetch
-brew install neofetch
-
-# Install a neovim
-brew install neovim
-brew tap caskroom/fonts
-brew cask install font-hack-nerd-font
-
-# Install a tig
-brew install tig
-
-# Install a jq
-brew install jq
-
-# Install a asciinema
-brew install asciinema
-
-# Install a autojump
-brew install autojump
 
 ln -s "${BASEDIR}/.zshrc" "${HOME}/.zshrc"
 ln -s "${BASEDIR}/.vimrc" "${HOME}/.vimrc"
