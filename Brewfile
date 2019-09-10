@@ -51,7 +51,6 @@ cask "docker-toolbox"
 cask "google-chrome"
 mas "Amphetamine", id: 937984704
 cask "paw"
-cask "quip"
 cask "yt-music"
 mas "Alfred", id: 405843582
 cask "postman"
@@ -60,3 +59,4 @@ mas "Magnet", id: 441258766
 mas "Window Tidy", id: 456609775
 mas "Slack", id: 803453959
 cask "visual-studio-code"
+cask "sourcetree"
