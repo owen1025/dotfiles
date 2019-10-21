@@ -58,3 +58,4 @@ mas "Magnet", id: 441258766
 mas "Window Tidy", id: 456609775
 mas "Slack", id: 803453959
 cask "visual-studio-code"
+cask "sourcetree"
