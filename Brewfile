@@ -50,8 +50,6 @@ cask "iterm2"
 cask "docker-toolbox"
 cask "google-chrome"
 mas "Amphetamine", id: 937984704
-cask "paw"
-cask "quip"
 cask "yt-music"
 mas "Alfred", id: 405843582
 cask "postman"
