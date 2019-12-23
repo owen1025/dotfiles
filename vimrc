@@ -30,6 +30,8 @@ Plugin 'leafgarland/typescript-vim'
 
 Plugin 'hashivim/vim-terraform'
 
+Plugin 'easymotion/vim-easymotion'
+
 call vundle#end()            " required
 filetype plugin indent on" required
 " ####################### Vundle stop #######################
@@ -166,7 +168,7 @@ map <S-l> <S-Right>
 map <Leader>z <C-W><Left>
 map <Leader>x <C-W>w
 
-noremap <C-q> :wq!<CR>
+noremap <C-q> :q!<CR>
 
 " vim-airline
 let g:airline#extensions#tabline#enabled = 1
@@ -183,6 +185,9 @@ let NERDTreeShowHidden=1
 
 nmap <Leader>q <plug>NERDTreeTabsToggle<CR>
 let g:NERDTreeMouseMode = 3
+
+autocmd StdinReadPre * let s:std_in=1
+autocmd VimEnter * if argc() == 0 && !exists("s:std_in") | NERDTree | endif
 
 " indentLine
 let g:indentLine_setColors = 0
@@ -344,3 +349,19 @@ nnoremap <silent> <space>p  :<C-u>CocListResume<CR>
 let g:terraform_align=1
 " let g:terraform_fold_sections=1
 let g:terraform_fmt_on_save=1
+
+" vim-easymotion setting
+" <Leader>f{char} to move to {char}
+map  <Leader>f <Plug>(easymotion-bd-f)
+nmap <Leader>f <Plug>(easymotion-overwin-f)
+
+" s{char}{char} to move to {char}{char}
+nmap s <Plug>(easymotion-overwin-f2)
+
+" Move to line
+map <Leader>L <Plug>(easymotion-bd-jk)
+nmap <Leader>L <Plug>(easymotion-overwin-line)
+
+" Move to word
+map  <Leader>w <Plug>(easymotion-bd-w)
+nmap <Leader>w <Plug>(easymotion-overwin-w)
