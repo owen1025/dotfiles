@@ -22,7 +22,6 @@ Plugin 'leafgarland/typescript-vim'
 Plugin 'hashivim/vim-terraform'
 Plugin 'easymotion/vim-easymotion'
 Plugin 'tpope/vim-surround'
-Plugin 'pearofducks/ansible-vim'
 
 call vundle#end()            " required
 filetype plugin indent on" required
@@ -41,6 +40,7 @@ Plug 'chr4/nginx.vim'
 Plug 'moby/moby' , {'rtp': '/contrib/syntax/vim/'}
 Plug 'neoclide/coc.nvim', {'branch': 'release'}
 Plug 'terryma/vim-multiple-cursors'
+Plug 'pearofducks/ansible-vim'
 
 " Initialize plugin system
 call plug#end()
@@ -206,6 +206,8 @@ autocmd BufWritePost * NERDTreeFocus | execute 'normal R' | wincmd p
 let g:NERDTreeHighlightFolders = 1 " enables folder icon highlighting using exact match
 let g:NERDTreeHighlightFoldersFullName = 1 " highlights the folder name
 
+let g:NERDTreeAutoCenter=0
+
 " Coc.nvim
 " if hidden is not set, TextEdit might fail.
 set hidden
@@ -351,3 +353,12 @@ nmap s <Plug>(easymotion-overwin-f2)
 " Move to line
 map <Leader>L <Plug>(easymotion-bd-jk)
 nmap <Leader>L <Plug>(easymotion-overwin-line)
+
+" vim-ansible set up
+let g:ansible_unindent_after_newline = 1
+let g:ansible_attribute_highlight = "ob"
+let g:ansible_name_highlight = 'd'
+let g:ansible_extra_keywords_highlight = 1
+let g:ansible_normal_keywords_highlight = 'Constant'
+let g:ansible_with_keywords_highlight = 'Constant'
+let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
