@@ -343,7 +343,7 @@ let g:terraform_fmt_on_save=1
 " vim-easymotion setting
 " <Leader>f{char} to move to {char}
 map  <Leader>f <Plug>(easymotion-bd-f)
-nmap <Leader>f <Plug>(easymotion-overwin-fr
+nmap <Leader>f <Plug>(easymotion-overwin-f)
 
 " s{char}{char} to move to {char}{char}
 nmap s <Plug>(easymotion-overwin-f2)
@@ -351,12 +351,3 @@ nmap s <Plug>(easymotion-overwin-f2)
 " Move to line
 map <Leader>L <Plug>(easymotion-bd-jk)
 nmap <Leader>L <Plug>(easymotion-overwin-line)
-
-" vim-ansible set up
-let g:ansible_unindent_after_newline = 1
-let g:ansible_attribute_highlight = "ob"
-let g:ansible_name_highlight = 'd'
-let g:ansible_extra_keywords_highlight = 1
-let g:ansible_normal_keywords_highlight = 'Constant'
-let g:ansible_with_keywords_highlight = 'Constant'
-let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
