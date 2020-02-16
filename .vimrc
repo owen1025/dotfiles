@@ -8,32 +8,20 @@ set rtp+=~/.vim/bundle/Vundle.vim
 call vundle#begin()
 
 Plugin 'VundleVim/Vundle.vim'
-
 Plugin 'vim-airline/vim-airline'
 Plugin 'vim-airline/vim-airline-themes'
-
 Plugin 'scrooloose/nerdtree'
 Plugin 'jistr/vim-nerdtree-tabs'
 Plugin 'Xuyuanp/nerdtree-git-plugin'
-
 Plugin 'Yggdroot/indentLine'
-
 Plugin 'scrooloose/syntastic'
-
 Plugin 'tpope/vim-fugitive'
-
 Plugin 'airblade/vim-gitgutter'
-
 Plugin 'jiangmiao/auto-pairs'
-
 Plugin 'leafgarland/typescript-vim'
-
 Plugin 'hashivim/vim-terraform'
-
 Plugin 'easymotion/vim-easymotion'
-
 Plugin 'tpope/vim-surround'
-
 Plugin 'pearofducks/ansible-vim'
 
 call vundle#end()            " required
@@ -45,21 +33,13 @@ call plug#begin('~/.vim/plugged')
 
 Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': './install --bin' }
 Plug 'junegunn/fzf.vim'
-
 Plug 'ryanoasis/vim-devicons'
-
 Plug 'scrooloose/nerdcommenter'
-
 Plug 'kaicataldo/material.vim'
-
 Plug 'cespare/vim-toml'
-
 Plug 'chr4/nginx.vim'
-
 Plug 'moby/moby' , {'rtp': '/contrib/syntax/vim/'}
-
 Plug 'neoclide/coc.nvim', {'branch': 'release'}
-
 Plug 'terryma/vim-multiple-cursors'
 
 " Initialize plugin system
@@ -371,3 +351,12 @@ nmap s <Plug>(easymotion-overwin-f2)
 " Move to line
 map <Leader>L <Plug>(easymotion-bd-jk)
 nmap <Leader>L <Plug>(easymotion-overwin-line)
+
+" vim-ansible set up
+let g:ansible_unindent_after_newline = 1
+let g:ansible_attribute_highlight = "ob"
+let g:ansible_name_highlight = 'd'
+let g:ansible_extra_keywords_highlight = 1
+let g:ansible_normal_keywords_highlight = 'Constant'
+let g:ansible_with_keywords_highlight = 'Constant'
+let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
