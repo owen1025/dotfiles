@@ -7,7 +7,9 @@ ZSH_THEME="robbyrussell"
 
 plugins=(
   fasd
-  zsh-iterm-touchbar
+  aws
+  kubectl
+  kube-ps1
 )
 
 source $ZSH/oh-my-zsh.sh
@@ -37,22 +39,24 @@ antigen bundle lukechilds/zsh-nvm
 antigen apply
 
 # Run neofetch
-neofetch
-
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+# neofetch
 
 # Set powerlevel9k
 POWERLEVEL9K_MODE='nerdfont-complete'
 
-zsh_internet_signal(){
-  local color
-  local symbol="\uf7ba"
-  if ifconfig en0 | grep inactive &> /dev/null; then
-  color="%F{red}"
-  else
-  color="%F{blue}"
-  fi
-  echo -n "%{$color%}$symbol "
+# zsh_internet_signal(){
+#   local color
+#   local symbol="\uf7ba"
+#   if ifconfig en0 | grep inactive &> /dev/null; then
+#   color="%F{red}"
+#   else
+#   color="%F{blue}"
+#   fi
+#   echo -n "%{$color%}$symbol "
+# }
+
+zsh_custom_kube_ps1(){
+  echo -n "$(_kube_ps1_symbol)$KUBE_PS1_SEPERATOR$KUBE_PS1_CONTEXT$KUBE_PS1_DIVIDER$KUBE_PS1_NAMESPACE" | sed 's/arn.*\:cluster\///g'
 }
 
 POWERLEVEL9K_PROMPT_ON_NEWLINE=true
@@ -65,6 +69,7 @@ POWERLEVEL9K_RVM_FOREGROUND="249"
 POWERLEVEL9K_RVM_VISUAL_IDENTIFIER_COLOR="red"
 POWERLEVEL9K_TIME_BACKGROUND="black"
 POWERLEVEL9K_TIME_FOREGROUND="249"
+POWERLEVEL9K_CUSTOM_KUBE_PS1='zsh_custom_kube_ps1'
 POWERLEVEL9K_TIME_FORMAT="\UF43A %D{%I:%M  \UF133  %m.%d.%y}"
 POWERLEVEL9K_RVM_BACKGROUND="black"
 POWERLEVEL9K_RVM_FOREGROUND="249"
@@ -89,16 +94,26 @@ POWERLEVEL9K_VCS_OUTGOING_CHANGES_ICON='\u2191'
 POWERLEVEL9K_VCS_COMMIT_ICON="\uf417"
 POWERLEVEL9K_MULTILINE_FIRST_PROMPT_PREFIX="%F{blue}\u256D\u2500%f"
 POWERLEVEL9K_MULTILINE_LAST_PROMPT_PREFIX="%F{blue}\u2570\uf460%f "
-POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(context os_icon custom_internet_signal custom_battery_status_joined ssh root_indicator dir dir_writable vcs)
-POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(command_execution_time  status  time)
+POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(context os_icon ssh root_indicator dir dir_writable  vcs)
+POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(command_execution_time status custom_kube_ps1)
 HIST_STAMPS="mm/dd/yyyy"
 DISABLE_UPDATE_PROMPT=true
 
 # Hide a user name
 prompt_context() {}
 
+# kube_ps1 auto disabled
+# kubeoff
+
 # `Frozing' tty, so after any command terminal settings will be restored
 ttyctl -f
+
+# Custom common alias
+alias la="ls -al"
+
+# Custom brew alias
+alias bi="brew install"
+alias bri="brew reinstall"
 
 # Custom docker alias
 alias dkrmC='docker rm $(docker ps -qaf status=exited)'
@@ -132,6 +147,7 @@ alias txa="tmux -2 -u attach -t"
 
 # Custom vim alias
 alias v="nvim"
+alias vim="nvim"
 
 # Custom terraform alias
 alias ti="terraform init"
@@ -142,3 +158,15 @@ alias td="terraform destroy"
 
 # Custom ansible alias
 alias ap="ansible-playbook"
+
+# Custom kubectl alias
+alias ka="kubectl apply -f"
+alias kgp="kubectl get pods"
+alias kgd="kubectl get deployment"
+alias kgl="kubectl logs"
+alias kgn="kubectl get nodes"
+alias kec="kubectl exec -it"
+
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+PROMPT=$PROMPT'$(kube_ps1) '

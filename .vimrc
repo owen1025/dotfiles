@@ -32,6 +32,10 @@ Plugin 'hashivim/vim-terraform'
 
 Plugin 'easymotion/vim-easymotion'
 
+Plugin 'tpope/vim-surround'
+
+Plugin 'pearofducks/ansible-vim'
+
 call vundle#end()            " required
 filetype plugin indent on" required
 " ####################### Vundle stop #######################
@@ -55,6 +59,8 @@ Plug 'chr4/nginx.vim'
 Plug 'moby/moby' , {'rtp': '/contrib/syntax/vim/'}
 
 Plug 'neoclide/coc.nvim', {'branch': 'release'}
+
+Plug 'terryma/vim-multiple-cursors'
 
 " Initialize plugin system
 call plug#end()
@@ -119,6 +125,7 @@ set tenc=utf-8
 set incsearch        " 키워드 입력시 점진적 검색
 set history=1000
 set t_Co=256
+set notermguicolors
 
 autocmd FileType yaml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType yml setlocal ts=2 sts=2 sw=2 expandtab
@@ -169,6 +176,9 @@ map <Leader>z <C-W><Left>
 map <Leader>x <C-W>w
 
 noremap <C-q> :q!<CR>
+
+nnoremap <C-z> :undo<CR>
+nnoremap <S-z> :redo<CR>
 
 " vim-airline
 let g:airline#extensions#tabline#enabled = 1
@@ -353,7 +363,7 @@ let g:terraform_fmt_on_save=1
 " vim-easymotion setting
 " <Leader>f{char} to move to {char}
 map  <Leader>f <Plug>(easymotion-bd-f)
-nmap <Leader>f <Plug>(easymotion-overwin-f)
+nmap <Leader>f <Plug>(easymotion-overwin-fr
 
 " s{char}{char} to move to {char}{char}
 nmap s <Plug>(easymotion-overwin-f2)
@@ -361,7 +371,3 @@ nmap s <Plug>(easymotion-overwin-f2)
 " Move to line
 map <Leader>L <Plug>(easymotion-bd-jk)
 nmap <Leader>L <Plug>(easymotion-overwin-line)
-
-" Move to word
-map  <Leader>w <Plug>(easymotion-bd-w)
-nmap <Leader>w <Plug>(easymotion-overwin-w)
