@@ -37,24 +37,6 @@ antigen bundle lukechilds/zsh-nvm
 # Tell Antigen that you're done.
 antigen apply
 
-# Run neofetch
-# neofetch
-
-# zsh_custom_kube_ps1(){
-#   echo -n "$(_kube_ps1_symbol)$KUBE_PS1_SEPERATOR$KUBE_PS1_CONTEXT$KUBE_PS1_DIVIDER$KUBE_PS1_NAMESPACE" | sed 's/arn.*\:cluster\///g'
-# }
-
-# powerlevel10k setting
-POWERLEVEL9K_VCS_CLEAN_FOREGROUND='black'
-POWERLEVEL9K_VCS_CLEAN_BACKGROUND='green'
-POWERLEVEL9K_VCS_UNTRACKED_FOREGROUND='black'
-POWERLEVEL9K_VCS_UNTRACKED_BACKGROUND='yellow'
-POWERLEVEL9K_VCS_MODIFIED_FOREGROUND='white'
-POWERLEVEL9K_VCS_MODIFIED_BACKGROUND='black'
-
-# kube_ps1 auto disabled
-# kubeoff
-
 # `Frozing' tty, so after any command terminal settings will be restored
 ttyctl -f
 
@@ -119,7 +101,8 @@ alias kec="kubectl exec -it"
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
-PROMPT=$PROMPT'$(kube_ps1) '
-
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 source ~/.p10k.zsh
+
+# Setup to python path
+export PATH="/Users/$(whoami)/Library/Python/2.7/bin:$PATH"
