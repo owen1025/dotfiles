@@ -99,6 +99,9 @@ alias kgl="kubectl logs"
 alias kgn="kubectl get nodes"
 alias kec="kubectl exec -it"
 
+alias kx="kubectx"
+alias ke="kubens"
+
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
