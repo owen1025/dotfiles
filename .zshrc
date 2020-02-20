@@ -102,6 +102,9 @@ alias kec="kubectl exec -it"
 alias kx="kubectx"
 alias ke="kubens"
 
+# Custom lazygit aliazs
+alias lg="lazygit"
+
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
