@@ -98,7 +98,7 @@
     # swap                  # used swap
     # todo                    # todo items (https://github.com/todotxt/todo.txt-cli)
     # timewarrior             # timewarrior tracking status (https://timewarrior.net/)
-    # time                    # current time
+    time                    # current time
     battery               # internal battery
     wifi                  # wifi speed
     # =========================[ Line #2 ]=========================
