@@ -105,6 +105,9 @@ alias ke="kubens"
 # Custom lazygit aliazs
 alias lg="lazygit"
 
+# get my external ip
+alias "gei"="curl -s http://whatismijnip.nl |cut -d \" \" -f 5"
+
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
