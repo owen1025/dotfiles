@@ -62,7 +62,7 @@ alias dkrmi="docker rmi"
 alias dkec="docker exec -it --entrypoint /bin/bash"
 alias dkp="docker push"
 
-# Custom git alias 
+# Custom git alias
 alias gi="git init"
 alias gc="git clone"
 alias gs="git status"
@@ -106,12 +106,18 @@ alias ke="kubens"
 alias lg="lazygit"
 
 # get my external ip
-alias "gei"="curl -s http://whatismijnip.nl |cut -d \" \" -f 5"
+alias gei="curl -s http://whatismijnip.nl |cut -d \" \" -f 5"
+
+# Custom tmuxinator alias
+alias txr="tmuxinator"
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
-# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
-source ~/.p10k.zsh
-
+# Custom ENV
 # Setup to python path
 export PATH="/Users/$(whoami)/Library/Python/2.7/bin:$PATH"
+export EDITOR="nvim"
+export TMUXINATOR_CONFIG="$HOME"
+
+# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
+source ~/.p10k.zsh
