@@ -77,6 +77,13 @@ alias tx="tmux -2 -u"
 alias txls="tmux list-sessions"
 alias txa="tmux -2 -u attach -t"
 
+# Custom tmuxinator alias
+alias txr="tmuxinator"
+alias txrl="tmuxinator list"
+alias txrn="tmuxinator new"
+alias txrs="tmuxinator start"
+alias txrd="tmuxinator delete"
+
 # Custom vim alias
 alias v="nvim"
 alias vim="nvim"
@@ -108,16 +115,13 @@ alias lg="lazygit"
 # get my external ip
 alias gei="curl -s http://whatismijnip.nl |cut -d \" \" -f 5"
 
-# Custom tmuxinator alias
-alias txr="tmuxinator"
-
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
 # Custom ENV
 # Setup to python path
 export PATH="/Users/$(whoami)/Library/Python/2.7/bin:$PATH"
 export EDITOR="nvim"
-export TMUXINATOR_CONFIG="$HOME"
+export TMUXINATOR_CONFIG="$HOME/.tmuxinator"
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 source ~/.p10k.zsh
