@@ -73,6 +73,7 @@ alias gct="git checkout"
 alias gm="git merge"
 
 # Custom tmux alias
+alias tmux="tmux -2 -u"
 alias tx="tmux -2 -u"
 alias txls="tmux list-sessions"
 alias txa="tmux -2 -u attach -t"
