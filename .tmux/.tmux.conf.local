@@ -310,4 +310,4 @@ bind _ split-window -v -c "#{pane_current_path}"
 
 # Kill pane/window/session shortcuts
 bind x kill-pane
-bind X confirm-before -p "kill other windows? (y/n)" "kill-window -a"
+bind X confirm-before -p "kill windows? (y/n)" "kill-window"
