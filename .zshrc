@@ -95,6 +95,10 @@ alias tp="terraform plan"
 alias ta="terraform apply"
 alias tc="terraform console"
 alias td="terraform destroy"
+alias tsls="terraform state list"
+alias tsrm="terraform state rm"
+alias tspl="terraform state pull"
+alias tsps="terraform state push"
 
 # Custom ansible alias
 alias ap="ansible-playbook"
