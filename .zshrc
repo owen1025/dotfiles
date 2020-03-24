@@ -99,6 +99,7 @@ alias tsls="terraform state list"
 alias tsrm="terraform state rm"
 alias tspl="terraform state pull"
 alias tsps="terraform state push"
+alias tri="terraform import"
 
 # Custom ansible alias
 alias ap="ansible-playbook"
