@@ -106,9 +106,11 @@ alias ap="ansible-playbook"
 
 # Custom kubectl alias
 alias ka="kubectl apply -f"
+alias kga="kubectl get all -A"
 alias kgp="kubectl get pods"
+alias kgpa="kubectl get pods -A"
 alias kgd="kubectl get deployment"
-alias kgl="kubectl logs"
+alias kgl="kubectl logs -f"
 alias kgn="kubectl get nodes"
 alias kec="kubectl exec -it"
 
