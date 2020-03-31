@@ -130,5 +130,8 @@ export PATH="/Users/$(whoami)/Library/Python/2.7/bin:$PATH"
 export EDITOR="nvim"
 export TMUXINATOR_CONFIG="$HOME/.tmuxinator"
 
+# Set iCloud path
+export ICLOUD=~/Library/Mobile\ Documents/com~apple~CloudDocs/
+
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 source ~/.p10k.zsh
