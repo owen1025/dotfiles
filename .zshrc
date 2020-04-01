@@ -31,9 +31,6 @@ antigen bundle zsh-users/zsh-autosuggestions
 # Load the theme.
 antigen theme romkatv/powerlevel10k
 
-# zsh-nvm
-antigen bundle lukechilds/zsh-nvm
-
 # Tell Antigen that you're done.
 antigen apply
 
@@ -106,12 +103,9 @@ alias ap="ansible-playbook"
 
 # Custom kubectl alias
 alias ka="kubectl apply -f"
-alias kga="kubectl get all -A"
-alias kgp="kubectl get pods"
-alias kgpa="kubectl get pods -A"
-alias kgd="kubectl get deployment"
+alias kg="kubectl get"
+alias kd="kubectl describe"
 alias kgl="kubectl logs -f"
-alias kgn="kubectl get nodes"
 alias kec="kubectl exec -it"
 
 alias kx="kubectx"
