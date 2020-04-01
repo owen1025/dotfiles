@@ -10,6 +10,7 @@ plugins=(
   aws
   kubectl
   kube-ps1
+  sudo
 )
 
 source $ZSH/oh-my-zsh.sh
@@ -27,6 +28,8 @@ antigen bundle command-not-found
 antigen bundle zsh-users/zsh-syntax-highlighting
 
 antigen bundle zsh-users/zsh-autosuggestions
+
+antigen bundle zsh-users/zsh-completions
 
 # Load the theme.
 antigen theme romkatv/powerlevel10k
@@ -70,7 +73,6 @@ alias gct="git checkout"
 alias gm="git merge"
 
 # Custom tmux alias
-alias tmux="tmux -2 -u"
 alias tx="tmux -2 -u"
 alias txls="tmux list-sessions"
 alias txa="tmux -2 -u attach -t"
@@ -84,7 +86,6 @@ alias txrd="tmuxinator delete"
 
 # Custom vim alias
 alias v="nvim"
-alias vim="nvim"
 
 # Custom terraform alias
 alias ti="terraform init"
@@ -96,6 +97,7 @@ alias tsls="terraform state list"
 alias tsrm="terraform state rm"
 alias tspl="terraform state pull"
 alias tsps="terraform state push"
+alias tsmv="terraform state mv"
 alias tri="terraform import"
 
 # Custom ansible alias
@@ -125,5 +127,16 @@ export PATH="/Users/$(whoami)/Library/Python/2.7/bin:$PATH"
 export EDITOR="nvim"
 export TMUXINATOR_CONFIG="$HOME/.tmuxinator"
 
+# Set iCloud path
+export ICLOUD=~/Library/Mobile\ Documents/com~apple~CloudDocs/
+
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 source ~/.p10k.zsh
+
+# fuck
+eval $(thefuck --alias)
+
+# autojump
+if [[ $OSTYPE == 'linux-gnu' ]]; then
+    . /usr/share/autojump/autojump.sh
+fi

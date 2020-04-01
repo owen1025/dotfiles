@@ -147,10 +147,14 @@ noremap <S-Up> 5k
 noremap <S-Down> 5j
 noremap <S-Left> 20h
 noremap <S-Right> 20l
-map <S-k> <S-Up>
-map <S-j> <S-Down>
-map <S-h> <S-Left>
-map <S-l> <S-Right>
+" map <S-k> <S-Up>
+" map <S-j> <S-Down>
+" map <S-h> <S-Left>
+" map <S-l> <S-Right>
+noremap <S-K> 5k
+noremap <S-J> 5j
+noremap <S-H> 20h
+noremap <S-L> 20l
 
 map <Leader>z <C-W><Left>
 map <Leader>x <C-W>w
@@ -362,3 +366,6 @@ let g:ansible_extra_keywords_highlight = 1
 let g:ansible_normal_keywords_highlight = 'Constant'
 let g:ansible_with_keywords_highlight = 'Constant'
 let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
+
+" vim-multiple-cursors set up
+let g:multi_cursor_select_all_word_key = '<C-a>'
