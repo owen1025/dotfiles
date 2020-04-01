@@ -105,8 +105,9 @@ alias ap="ansible-playbook"
 
 # Custom kubectl alias
 alias ka="kubectl apply -f"
+alias kd="kubectl delete -f"
 alias kg="kubectl get"
-alias kd="kubectl describe"
+alias kde="kubectl describe"
 alias kgl="kubectl logs -f"
 alias kec="kubectl exec -it"
 
