@@ -104,8 +104,8 @@ alias tri="terraform import"
 alias ap="ansible-playbook"
 
 # Custom kubectl alias
-alias ka="kubectl apply -f"
-alias kd="kubectl delete -f"
+alias ka="kubectl apply"
+alias kd="kubectl delete"
 alias kg="kubectl get"
 alias kde="kubectl describe"
 alias kgl="kubectl logs -f"
