@@ -10,6 +10,7 @@ plugins=(
   aws
   kubectl
   kube-ps1
+  sudo
 )
 
 source $ZSH/oh-my-zsh.sh
@@ -28,11 +29,10 @@ antigen bundle zsh-users/zsh-syntax-highlighting
 
 antigen bundle zsh-users/zsh-autosuggestions
 
+antigen bundle zsh-users/zsh-completions
+
 # Load the theme.
 antigen theme romkatv/powerlevel10k
-
-# zsh-nvm
-antigen bundle lukechilds/zsh-nvm
 
 # Tell Antigen that you're done.
 antigen apply
@@ -73,7 +73,6 @@ alias gct="git checkout"
 alias gm="git merge"
 
 # Custom tmux alias
-alias tmux="tmux -2 -u"
 alias tx="tmux -2 -u"
 alias txls="tmux list-sessions"
 alias txa="tmux -2 -u attach -t"
@@ -87,7 +86,6 @@ alias txrd="tmuxinator delete"
 
 # Custom vim alias
 alias v="nvim"
-alias vim="nvim"
 
 # Custom terraform alias
 alias ti="terraform init"
@@ -106,11 +104,11 @@ alias tri="terraform import"
 alias ap="ansible-playbook"
 
 # Custom kubectl alias
-alias ka="kubectl apply -f"
-alias kgp="kubectl get pods"
-alias kgd="kubectl get deployment"
-alias kgl="kubectl logs"
-alias kgn="kubectl get nodes"
+alias ka="kubectl apply"
+alias kd="kubectl delete"
+alias kg="kubectl get"
+alias kde="kubectl describe"
+alias kgl="kubectl logs -f"
 alias kec="kubectl exec -it"
 
 alias kx="kubectx"
@@ -135,3 +133,11 @@ export ICLOUD=~/Library/Mobile\ Documents/com~apple~CloudDocs
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 source ~/.p10k.zsh
+
+# fuck
+eval $(thefuck --alias)
+
+# autojump
+if [[ $OSTYPE == 'linux-gnu' ]]; then
+    . /usr/share/autojump/autojump.sh
+fi
