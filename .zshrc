@@ -104,9 +104,10 @@ alias tri="terraform import"
 alias ap="ansible-playbook"
 
 # Custom kubectl alias
-alias ka="kubectl apply -f"
+alias ka="kubectl apply"
+alias kd="kubectl delete"
 alias kg="kubectl get"
-alias kd="kubectl describe"
+alias kde="kubectl describe"
 alias kgl="kubectl logs -f"
 alias kec="kubectl exec -it"
 alias kpf="kubectl port-forward"
@@ -129,7 +130,7 @@ export EDITOR="nvim"
 export TMUXINATOR_CONFIG="$HOME/.tmuxinator"
 
 # Set iCloud path
-export ICLOUD=~/Library/Mobile\ Documents/com~apple~CloudDocs/
+export ICLOUD=~/Library/Mobile\ Documents/com~apple~CloudDocs
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 source ~/.p10k.zsh
