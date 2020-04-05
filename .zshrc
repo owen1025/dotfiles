@@ -109,6 +109,7 @@ alias kg="kubectl get"
 alias kd="kubectl describe"
 alias kgl="kubectl logs -f"
 alias kec="kubectl exec -it"
+alias kpf="kubectl port-forward"
 
 alias kx="kubectx"
 alias ke="kubens"
