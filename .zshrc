@@ -121,6 +121,9 @@ alias lg="lazygit"
 # get my external ip
 alias gei="curl -s http://whatismijnip.nl |cut -d \" \" -f 5"
 
+# kill zombie processes
+alias kzp="kill $(ps -A -ostat,ppid | awk '/[zZ]/ && !a[$2]++ {print $2}')"
+
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
 # Custom ENV
