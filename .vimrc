@@ -106,6 +106,7 @@ set incsearch        " 키워드 입력시 점진적 검색
 set history=1000
 set t_Co=256
 set notermguicolors
+set clipboard=unnamed " use OS clipboard
 
 autocmd FileType yaml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType yml setlocal ts=2 sts=2 sw=2 expandtab

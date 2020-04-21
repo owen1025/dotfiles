@@ -143,7 +143,7 @@ source ~/.p10k.zsh
 # fuck
 eval $(thefuck --alias)
 
-# autojump
+# autojump(only linux)
 if [[ $OSTYPE == 'linux-gnu' ]]; then
     . /usr/share/autojump/autojump.sh
 fi
