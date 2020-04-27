@@ -3,8 +3,6 @@ export TERM="xterm-256color"
 # Path to your oh-my-zsh installation.
 export ZSH="${HOME}/.oh-my-zsh"
 
-ZSH_THEME="robbyrussell"
-
 plugins=(
   fasd
   aws
@@ -32,7 +30,7 @@ antigen bundle zsh-users/zsh-autosuggestions
 antigen bundle zsh-users/zsh-completions
 
 # Load the theme.
-antigen theme romkatv/powerlevel10k
+# antigen theme romkatv/powerlevel10k
 
 # Tell Antigen that you're done.
 antigen apply
