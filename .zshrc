@@ -39,7 +39,7 @@ antigen apply
 ttyctl -f
 
 # Custom common alias
-alias la="ls -al"
+alias la="exa -al"
 
 # Custom brew alias
 alias bi="brew install"
