@@ -30,7 +30,7 @@ antigen bundle zsh-users/zsh-autosuggestions
 antigen bundle zsh-users/zsh-completions
 
 # Load the theme.
-# antigen theme romkatv/powerlevel10k
+antigen theme romkatv/powerlevel10k
 
 # Tell Antigen that you're done.
 antigen apply
@@ -120,7 +120,7 @@ alias lg="lazygit"
 alias gei="curl -s http://whatismijnip.nl |cut -d \" \" -f 5"
 
 # get zombie processes
-alias gzp="ps -ef | grep defunct | grep -v grep"
+alias gzp="ps axo stat,ppid,pid,comm | grep -w defunct"
 # kill zombie processes
 alias kzp="kill $(ps -A -ostat,ppid | awk '/[zZ]/ && !a[$2]++ {print $2}')"
 
@@ -145,3 +145,6 @@ eval $(thefuck --alias)
 if [[ $OSTYPE == 'linux-gnu' ]]; then
     . /usr/share/autojump/autojump.sh
 fi
+
+# stern completion
+source <(stern --completion=zsh)
