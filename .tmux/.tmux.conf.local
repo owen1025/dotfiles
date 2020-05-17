@@ -311,3 +311,9 @@ bind _ split-window -v -c "#{pane_current_path}"
 # Kill pane/window/session shortcuts
 bind x kill-pane
 bind X confirm-before -p "kill windows? (y/n)" "kill-window"
+
+# pane resizing
+bind -r S-Left resize-pane -L 2
+bind -r S-Down resize-pane -D 2
+bind -r S-Up resize-pane -U 2
+bind -r S-Right L resize-pane -R 2
