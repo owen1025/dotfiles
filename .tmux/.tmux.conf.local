@@ -317,3 +317,7 @@ bind -r S-Left resize-pane -L 2
 bind -r S-Down resize-pane -D 2
 bind -r S-Up resize-pane -U 2
 bind -r S-Right L resize-pane -R 2
+
+# change window number
+bind-key -n C-S-Left swap-window -t -1
+bind-key -n C-S-Right swap-window -t +1
