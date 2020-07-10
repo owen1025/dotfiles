@@ -103,15 +103,18 @@ alias ap="ansible-playbook"
 
 # Custom kubectl alias
 alias ka="kubectl apply"
-alias kd="kubectl delete"
+# alias kd="kubectl delete"
 alias kg="kubectl get"
 alias kde="kubectl describe"
 alias kgl="kubectl logs -f"
 alias kec="kubectl exec -it"
 alias kpf="kubectl port-forward"
+alias ket="kubectl exec -it"
 
 alias kx="kubectx"
 alias ke="kubens"
+
+alias krb="kubectl run -i --rm --tty busybox --image=busybox -- sh"
 
 # Custom lazygit aliazs
 alias lg="lazygit"
@@ -148,3 +151,6 @@ fi
 
 # stern completion
 source <(stern --completion=zsh)
+
+# krew environment
+export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"

@@ -22,6 +22,7 @@ Plugin 'leafgarland/typescript-vim'
 Plugin 'hashivim/vim-terraform'
 Plugin 'easymotion/vim-easymotion'
 Plugin 'tpope/vim-surround'
+Plugin 'mbbill/undotree'
 
 call vundle#end()            " required
 filetype plugin indent on" required
@@ -173,7 +174,7 @@ let g:airline_powerline_fonts = 1
 let g:airline_theme = 'bubblegum'
 
 " fzf
-nmap <C-r> :FZF<cr>
+nmap <C-S-r> :FZF<cr>
 
 " NERDTree
 let g:NERDTreeWinSize=25
@@ -371,4 +372,12 @@ let g:ansible_with_keywords_highlight = 'Constant'
 let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
 
 " vim-multiple-cursors set up
-let g:multi_cursor_select_all_word_key = '<C-a>'
+let g:multi_cursor_select_all_word_key = '<S-a>'
+
+" vim-undotree set up
+nnoremap <Leader>u :UndotreeToggle<cr>
+let g:undotree_WindowLayout = 4
+if has("persistent_undo")
+    set undodir=$HOME."/.undodir"
+    set undofile
+endif
