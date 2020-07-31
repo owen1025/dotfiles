@@ -107,14 +107,17 @@ alias ka="kubectl apply"
 alias kg="kubectl get"
 alias kde="kubectl describe"
 alias kgl="kubectl logs -f"
-alias kec="kubectl exec -it"
-alias kpf="kubectl port-forward"
 alias ket="kubectl exec -it"
+alias kpf="kubectl port-forward"
 
 alias kx="kubectx"
 alias ke="kubens"
 
 alias krb="kubectl run -i --rm --tty busybox --image=busybox -- sh"
+
+# helm alias
+alias h="helm"
+alias hla="helm list -A"
 
 # Custom lazygit aliazs
 alias lg="lazygit"

@@ -173,9 +173,6 @@ let g:airline#extensions#tabline#buffer_nr_show = 1
 let g:airline_powerline_fonts = 1
 let g:airline_theme = 'bubblegum'
 
-" fzf
-nmap <C-S-r> :FZF<cr>
-
 " NERDTree
 let g:NERDTreeWinSize=25
 " let g:nerdtree_tabs_open_on_console_startup = 1
@@ -381,3 +378,6 @@ if has("persistent_undo")
     set undodir=$HOME."/.undodir"
     set undofile
 endif
+
+" fzf
+nmap <C-S-r> :FZF<cr>
