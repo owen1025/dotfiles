@@ -114,6 +114,7 @@ alias kx="kubectx"
 alias ke="kubens"
 
 alias krb="kubectl run -i --rm --tty busybox --image=busybox -- sh"
+alias krc="kubectl run -i --rm --tty busybox --image=centos:latest -- bash"
 
 # helm alias
 alias h="helm"
@@ -130,7 +131,9 @@ alias gzp="ps axo stat,ppid,pid,comm | grep -w defunct"
 # kill zombie processes
 alias kzp="kill $(ps -A -ostat,ppid | awk '/[zZ]/ && !a[$2]++ {print $2}')"
 
+# fzf setup
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+# Always enable preview window on the right with 60% width
 
 # Custom ENV
 # Setup to python path
@@ -157,3 +160,7 @@ source <(stern --completion=zsh)
 
 # krew environment
 export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
+
+# awsp alias
+# https://github.com/johnnyopao/awsp
+alias awsp="source _awsp"

@@ -22,7 +22,6 @@ Plugin 'leafgarland/typescript-vim'
 Plugin 'hashivim/vim-terraform'
 Plugin 'easymotion/vim-easymotion'
 Plugin 'tpope/vim-surround'
-Plugin 'mbbill/undotree'
 
 call vundle#end()            " required
 filetype plugin indent on" required
@@ -109,6 +108,7 @@ set history=1000
 set t_Co=256
 set notermguicolors
 set clipboard=unnamed " use OS clipboard
+set undofile
 
 autocmd FileType yaml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType yml setlocal ts=2 sts=2 sw=2 expandtab
@@ -120,13 +120,6 @@ au BufNewFile,BufRead Jenkinsfile setf groovy " Jenkinsfile syntax on
 if (has('nvim'))
   let $NVIM_TUI_ENABLE_TRUE_COLOR = 1
 endif
-
-" For Neovim > 0.1.5 and Vim > patch 7.4.1799 - https://github.com/vim/vim/commit/61be73bb0f965a895bfb064ea3e55476ac175162
-" Based on Vim patch 7.4.1770 (`guicolors` option) - https://github.com/vim/vim/commit/8a633e3427b47286869aa4b96f2bfc1fe65b25cd
-" https://github.com/neovim/neovim/wiki/Following-HEAD#20160511
-" if (has('termguicolors'))
-"   set termguicolors
-" endif
 
 syntax on
 set background=dark
@@ -165,7 +158,9 @@ map <Leader>x <C-W>w
 noremap <C-q> :q!<CR>
 
 nnoremap <C-z> :undo<CR>
-nnoremap <S-z> :redo<CR>
+nnoremap <C-S-z> :redo<CR>
+
+map <Leader><C-r> :so %<CR>
 
 " vim-airline
 let g:airline#extensions#tabline#enabled = 1
@@ -371,13 +366,8 @@ let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
 " vim-multiple-cursors set up
 let g:multi_cursor_select_all_word_key = '<S-a>'
 
-" vim-undotree set up
-nnoremap <Leader>u :UndotreeToggle<cr>
-let g:undotree_WindowLayout = 4
-if has("persistent_undo")
-    set undodir=$HOME."/.undodir"
-    set undofile
-endif
-
 " fzf
-nmap <C-S-r> :FZF<cr>
+nmap <C-r> :GFiles<cr>
+nnoremap <C-r> :GFiles<cr>
+let g:fzf_preview_window = 'right:60%'
+autocmd VimEnter * command! -bang -nargs=? GFiles call fzf#vim#gitfiles(<q-args>, {'options': '--no-preview'}, <bang>0)
