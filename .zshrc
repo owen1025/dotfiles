@@ -7,7 +7,6 @@ plugins=(
   fasd
   aws
   kubectl
-  kube-ps1
   sudo
 )
 
@@ -150,10 +149,10 @@ source ~/.p10k.zsh
 # fuck
 eval $(thefuck --alias)
 
-# autojump(only linux)
-if [[ $OSTYPE == 'linux-gnu' ]]; then
-    . /usr/share/autojump/autojump.sh
-fi
+# autojump
+[[ -s /Users/jepil.choi/.autojump/etc/profile.d/autojump.sh ]] && source /Users/jepil.choi/.autojump/etc/profile.d/autojump.sh
+
+autoload -U compinit && compinit -u
 
 # stern completion
 source <(stern --completion=zsh)

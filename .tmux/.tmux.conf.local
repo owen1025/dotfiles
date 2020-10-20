@@ -270,8 +270,16 @@ tmux_conf_theme_clock_style='24'
 # on Linux, this requires xsel or xclip
 tmux_conf_copy_to_os_clipboard=false
 
+# -- Plugins -------------------------------------------------------------------
+
+# List of plugins
+set -g @plugin 'tmux-plugins/tpm'
+# set -g @plugin 'tmux-plugins/tmux-sensible'
+
+run '~/.tmux/plugins/tpm/tpm'
 
 # -- user customizations -------------------------------------------------------
+set -g default-terminal "xterm-256color" # colors!
 # this is the place to override or undo settings
 
 # increase history size
@@ -319,5 +327,12 @@ bind -r S-Up resize-pane -U 2
 bind -r S-Right resize-pane -R 2
 
 # change window number
-bind-key -n C-S-Left swap-window -t -1
-bind-key -n C-S-Right swap-window -t +1
+bind-key -n C-S-Left swap-window -t -1\; select-window -t -1
+bind-key -n C-S-Right swap-window -t +1\; select-window -t +1
+
+# reload configuration
+bind u source-file ~/.tmux.conf \; display '~/.tmux.conf reload configuration'
+
+run-shell ~/.tmux/plugins/tmux-resurrect/resurrect.tmux
+
+run '~/.tmux/plugins/tpm/tpm'

@@ -108,7 +108,11 @@ set history=1000
 set t_Co=256
 set notermguicolors
 set clipboard=unnamed " use OS clipboard
-set undofile
+" set undofile
+" lazy drawing
+set nolazyredraw
+set ttyfast
+set nocursorline
 
 autocmd FileType yaml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType yml setlocal ts=2 sts=2 sw=2 expandtab
@@ -157,10 +161,15 @@ map <Leader>x <C-W>w
 
 noremap <C-q> :q!<CR>
 
-nnoremap <C-z> :undo<CR>
-nnoremap <C-S-z> :redo<CR>
+" undo
+map <C-z> :undo<CR>
+" redo
+map <S-z> :redo<CR>
 
+" reload vim configuration
 map <Leader><C-r> :so %<CR>
+
+map q :nohl<CR>
 
 " vim-airline
 let g:airline#extensions#tabline#enabled = 1
@@ -347,13 +356,6 @@ let g:terraform_fmt_on_save=1
 map  <Leader>f <Plug>(easymotion-bd-f)
 nmap <Leader>f <Plug>(easymotion-overwin-f)
 
-" s{char}{char} to move to {char}{char}
-nmap s <Plug>(easymotion-overwin-f2)
-
-" Move to line
-map <Leader>L <Plug>(easymotion-bd-jk)
-nmap <Leader>L <Plug>(easymotion-overwin-line)
-
 " vim-ansible set up
 let g:ansible_unindent_after_newline = 1
 let g:ansible_attribute_highlight = "ob"
@@ -367,7 +369,5 @@ let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
 let g:multi_cursor_select_all_word_key = '<S-a>'
 
 " fzf
-nmap <C-r> :GFiles<cr>
-nnoremap <C-r> :GFiles<cr>
+nmap <C-e> :Files<cr>
 let g:fzf_preview_window = 'right:60%'
-autocmd VimEnter * command! -bang -nargs=? GFiles call fzf#vim#gitfiles(<q-args>, {'options': '--no-preview'}, <bang>0)
