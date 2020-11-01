@@ -86,7 +86,9 @@ alias v="nvim"
 
 # Custom terraform alias
 alias ti="terraform init"
+alias mti="export AWS_PROFILE=meshtools && terraform init"
 alias tp="terraform plan"
+alias mtp="export AWS_PROFILE=meshtools && terraform plan"
 alias ta="terraform apply"
 alias tc="terraform console"
 alias td="terraform destroy"
