@@ -39,7 +39,7 @@ Plug 'cespare/vim-toml'
 Plug 'chr4/nginx.vim'
 Plug 'moby/moby' , {'rtp': '/contrib/syntax/vim/'}
 Plug 'neoclide/coc.nvim', {'branch': 'release'}
-Plug 'terryma/vim-multiple-cursors'
+Plug 'mg979/vim-visual-multi', {'branch': 'master'}
 Plug 'pearofducks/ansible-vim'
 Plug 'pangloss/vim-javascript'
 
@@ -169,7 +169,11 @@ map <S-z> :redo<CR>
 " reload vim configuration
 map <Leader><C-r> :so %<CR>
 
+" search highlight disable
 map q :nohl<CR>
+
+:vnoremap < <gv
+:vnoremap > >gv
 
 " vim-airline
 let g:airline#extensions#tabline#enabled = 1
@@ -366,8 +370,9 @@ let g:ansible_with_keywords_highlight = 'Constant'
 let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
 
 " vim-multiple-cursors set up
-let g:multi_cursor_select_all_word_key = '<S-a>'
+" let g:multi_cursor_select_all_word_key = '<S-a>'
 
 " fzf
-nmap <C-e> :Files<cr>
-let g:fzf_preview_window = 'right:60%'
+let g:fzf_preview_window = ['right:50%', 'ctrl-/']
+map <C-e> :Files<cr>
+map <C-f> :BLines<cr>
