@@ -353,7 +353,7 @@ nnoremap <silent> <space>p  :<C-u>CocListResume<CR>
 " vim-terraform setting
 let g:terraform_align=1
 " let g:terraform_fold_sections=1
-let g:terraform_fmt_on_save=1
+" let g:terraform_fmt_on_save=1
 
 " vim-easymotion setting
 " <Leader>f{char} to move to {char}
@@ -368,9 +368,6 @@ let g:ansible_extra_keywords_highlight = 1
 let g:ansible_normal_keywords_highlight = 'Constant'
 let g:ansible_with_keywords_highlight = 'Constant'
 let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
-
-" vim-multiple-cursors set up
-" let g:multi_cursor_select_all_word_key = '<S-a>'
 
 " fzf
 let g:fzf_preview_window = ['right:50%', 'ctrl-/']

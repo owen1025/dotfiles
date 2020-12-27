@@ -1,72 +1,90 @@
+fg: &fg "white"
+bg: &bg "black"
+mark: &mark "darkgoldenrod"
+active: &active "dimgray"
+text: &text "navajowhite"
+white: &white "whitesmoke"
+ghost: &ghost "ghostwhite"
+dslate: &dslate "darkslategray"
+err: &err "pink"
+slate: &slate "slategray"
+gray: &gray "gray"
+
+# Skin
 k9s:
-  # General K9s styles
   body:
-    fgColor: '#eceef0'
-    bgColor: '#263137'
-    logoColor: '#0000ff'
-
-  # ClusterInfoView styles
+    fgColor: default
+    bgColor: default
+    logoColor: *fg
   info:
-    fgColor: lightskyblue
-    sectionColor: steelblue
-
-  # Frame styles
+    fgColor: *text
+    sectionColor: *fg
+  dialog:
+    fgColor: default
+    bgColor: default
+    buttonFgColor: *fg
+    buttonBgColor: *bg
+    buttonFocusFgColor: *slate
+    buttonFocusBgColor: *white
+    labelFgColor: *ghost
+    fieldFgColor: *white
   frame:
-    # Borders styles
     border:
-      fgColor: dodgerblue
-      focusColor: aliceblue
-
-    # MenuView attributes and styles
+      fgColor: *fg
+      focusColor: *fg
     menu:
-      fgColor: darkblue
-      keyColor: cornflowerblue
-      # Used for favorite namespaces
-      numKeyColor: cadetblue
-
-    # CrumbView attributes for history navigation.
+      fgColor: default
+      keyColor: default
+      numKeyColor: *text
     crumbs:
-      fgColor: white
-      bgColor: steelblue
-      activeColor: skyblue
-
-    # Resource status and update styles
+      fgColor: default
+      bgClor: default
+      activeColor: *active
     status:
-      newColor: '#00ff00'
-      modifyColor: powderblue
-     addColor: lightskyblue
-      errorColor: indianred
-      highlightcolor: royalblue
-      killColor: slategray
-      completedColor: gray
-
-    # Border title styles.
+      newColor: *white
+      modifyColor: *text
+      addColor: *ghost
+      errorColor: *err
+      highlightcolor: *dslate
+      killColor: *slate
+      completedColor: *gray
     title:
-      fgColor: aqua
-      bgColor: white
-      highlightColor: skyblue
-      counterColor: slateblue
-      filterColor: slategray
-  # Specific views styles
+      fgColor: *fg
+      highlightColor: *active
+      counterColor: *text
+      filterColor: *slate
   views:
-    # TableView attributes.
     table:
-      fgColor: blue
-      bgColor: darkblue
-      cursorColor: aqua
-      # Header row styles.
+      fgColor: default
+      bgColor: default
+      cursorBgColor: *fg
+      cursorFgColor: *bg
+      markColor: *mark
       header:
-        fgColor: white
-        bgColor: darkblue
-        sorterColor: orange
-
-    # YAML info styles.
+        fgColor: *dslate
+        bgColor: *bg
+        sorterColor: *fg
+    xray:
+      fgColor: *fg
+      bgColor: *bg
+      cursorColor: *ghost
+      graphicColor: gray
+      showIcons: false
     yaml:
-      keyColor: steelblue
-      colonColor: blue
-      valueColor: royalblue
-
-    # Logs styles.
+      keyColor: *ghost
+      colorColor: *slate
+      valueColor: *text
     logs:
-      fgColor: white
-      bgColor: black 
+      fgColor: *ghost
+      bgColor: *bg
+      indicator:
+        fgColor: *ghost
+        bgColor: *bg
+    charts:
+      bgColor: default
+      defaultDialColors:
+        - *white
+        - *err
+      defaultChartColors:
+        - *white
+        - *err

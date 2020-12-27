@@ -1,0 +1,31 @@
+hotKey:
+  
+  shift-q:
+    shortCut:    Shift-Q
+    description: close
+    command:     quit
+  
+  shift-c:
+    shortCut:    Shift-C
+    description: change ctx
+    command:     ctx
+  
+  shift-n:
+    shortCut:    Shift-N
+    description: change namespace
+    command:     ns
+
+  shift-1:
+    shortCut:    Shift-1
+    description: Viewing pods
+    command:     pods
+
+  shift-2:
+    shortCut:    Shift-2
+    description: View deployments
+    command:     dp
+
+  shift-3:
+    shortCut:    Shift-3
+    description: View service
+    command:     svc
