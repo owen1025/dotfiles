@@ -152,7 +152,7 @@ source ~/.p10k.zsh
 eval $(thefuck --alias)
 
 # autojump
-[[ -s /Users/jepil.choi/.autojump/etc/profile.d/autojump.sh ]] && source /Users/jepil.choi/.autojump/etc/profile.d/autojump.sh
+[ -f /opt/homebrew/etc/profile.d/autojump.sh ] && . /opt/homebrew/etc/profile.d/autojump.sh
 
 autoload -U compinit && compinit -u
 
