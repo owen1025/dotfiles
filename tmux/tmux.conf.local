@@ -71,6 +71,7 @@ tmux_conf_theme_pane_indicator='#00afff'                # light blue
 tmux_conf_theme_pane_active_indicator='#00afff'         # light blue
 
 # status line style
+
 tmux_conf_theme_message_fg='#000000'                    # black
 tmux_conf_theme_message_bg='#ffff00'                    # yellow
 tmux_conf_theme_message_attr='bold'
@@ -272,11 +273,7 @@ tmux_conf_copy_to_os_clipboard=false
 
 # -- Plugins -------------------------------------------------------------------
 
-# List of plugins
-set -g @plugin 'tmux-plugins/tpm'
-# set -g @plugin 'tmux-plugins/tmux-sensible'
-
-run '~/.tmux/plugins/tpm/tpm'
+run-shell ~/clone/path/resurrect.tmux
 
 # -- user customizations -------------------------------------------------------
 set -g default-terminal "xterm-256color" # colors!
@@ -330,9 +327,8 @@ bind -r S-Right resize-pane -R 2
 bind-key -n C-S-Left swap-window -t -1\; select-window -t -1
 bind-key -n C-S-Right swap-window -t +1\; select-window -t +1
 
+# pane simultaneous input
+bind a set-window-option synchronize-panes
+
 # reload configuration
 bind u source-file ~/.tmux.conf \; display '~/.tmux.conf reload configuration'
-
-run-shell ~/.tmux/plugins/tmux-resurrect/resurrect.tmux
-
-run '~/.tmux/plugins/tpm/tpm'
