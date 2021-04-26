@@ -154,14 +154,6 @@ eval $(thefuck --alias)
 # autojump
 [ -f /opt/homebrew/etc/profile.d/autojump.sh ] && . /opt/homebrew/etc/profile.d/autojump.sh
 
-# kubectx zsh completion
-mkdir -p ~/.oh-my-zsh/completions
-chmod -R 755 ~/.oh-my-zsh/completions
-ln -s /opt/kubectx/completion/kubectx.zsh ~/.oh-my-zsh/completions/_kubectx.zsh
-ln -s /opt/kubectx/completion/kubens.zsh ~/.oh-my-zsh/completions/_kubens.zsh
-
-autoload -U compinit && compinit -u
-
 # stern completion
 source <(stern --completion=zsh)
 
@@ -171,3 +163,5 @@ export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
 # awsp alias
 # https://github.com/johnnyopao/awsp
 alias awsp="source _awsp"
+
+autoload -U compinit && compinit -u
