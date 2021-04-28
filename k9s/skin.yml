@@ -1,90 +1,105 @@
-fg: &fg "white"
-bg: &bg "black"
-mark: &mark "darkgoldenrod"
-active: &active "dimgray"
-text: &text "navajowhite"
-white: &white "whitesmoke"
-ghost: &ghost "ghostwhite"
-dslate: &dslate "darkslategray"
-err: &err "pink"
-slate: &slate "slategray"
-gray: &gray "gray"
+foreground: &foreground "#eceef0"
+background: &background "#263137"
+current_line: &current_line "#44475a"
+selection: &selection "#44475a"
+comment: &comment "#6272a4"
+cyan: &cyan "#607c8b"
+green: &green "#50fa7b"
+orange: &orange "#ffb86c"
+pink: &pink "#40c4fe"
+purple: &purple "#40c4fe"
+red: &red "#ff5555"
+yellow: &yellow "#f1fa8c"
 
-# Skin
+# Skin...
 k9s:
+  # General K9s styles
   body:
-    fgColor: default
-    bgColor: default
-    logoColor: *fg
+    fgColor: *foreground
+    bgColor: *background
+    logoColor: *purple
+  # ClusterInfoView styles.
   info:
-    fgColor: *text
-    sectionColor: *fg
+    fgColor: *pink
+    sectionColor: *foreground
+  # Dialog styles.
   dialog:
-    fgColor: default
-    bgColor: default
-    buttonFgColor: *fg
-    buttonBgColor: *bg
-    buttonFocusFgColor: *slate
-    buttonFocusBgColor: *white
-    labelFgColor: *ghost
-    fieldFgColor: *white
+    fgColor: *foreground
+    bgColor: *background
+    buttonFgColor: *foreground
+    buttonBgColor: *purple
+    buttonFocusFgColor: *yellow
+    buttonFocusBgColor: *pink
+    labelFgColor: *orange
+    fieldFgColor: *foreground
   frame:
+    # Borders styles.
     border:
-      fgColor: *fg
-      focusColor: *fg
+      fgColor: *selection
+      focusColor: *current_line
     menu:
-      fgColor: default
-      keyColor: default
-      numKeyColor: *text
+      fgColor: *foreground
+      keyColor: *pink
+      # Used for favorite namespaces
+      numKeyColor: *pink
+    # CrumbView attributes for history navigation.
     crumbs:
-      fgColor: default
-      bgClor: default
-      activeColor: *active
+      fgColor: *foreground
+      bgColor: *current_line
+      activeColor: *current_line
+    # Resource status and update styles
     status:
-      newColor: *white
-      modifyColor: *text
-      addColor: *ghost
-      errorColor: *err
-      highlightcolor: *dslate
-      killColor: *slate
-      completedColor: *gray
+      newColor: *cyan
+      modifyColor: *purple
+      addColor: *green
+      errorColor: *red
+      highlightcolor: *orange
+      killColor: *comment
+      completedColor: *comment
+    # Border title styles.
     title:
-      fgColor: *fg
-      highlightColor: *active
-      counterColor: *text
-      filterColor: *slate
+      fgColor: *foreground
+      bgColor: *current_line
+      highlightColor: *orange
+      counterColor: *purple
+      filterColor: *pink
   views:
-    table:
-      fgColor: default
-      bgColor: default
-      cursorBgColor: *fg
-      cursorFgColor: *bg
-      markColor: *mark
-      header:
-        fgColor: *dslate
-        bgColor: *bg
-        sorterColor: *fg
-    xray:
-      fgColor: *fg
-      bgColor: *bg
-      cursorColor: *ghost
-      graphicColor: gray
-      showIcons: false
-    yaml:
-      keyColor: *ghost
-      colorColor: *slate
-      valueColor: *text
-    logs:
-      fgColor: *ghost
-      bgColor: *bg
-      indicator:
-        fgColor: *ghost
-        bgColor: *bg
+    # Charts skins...
     charts:
       bgColor: default
       defaultDialColors:
-        - *white
-        - *err
+        - *purple
+        - *red
       defaultChartColors:
-        - *white
-        - *err
+        - *purple
+        - *red
+    # TableView attributes.
+    table:
+      fgColor: *foreground
+      bgColor: *background
+      cursorFgColor: *foreground
+      cursorBgColor: *current_line
+      # Header row styles.
+      header:
+        fgColor: *foreground
+        bgColor: *background
+        sorterColor: *cyan
+    # Xray view attributes.
+    xray:
+      fgColor: *foreground
+      bgColor: *background
+      cursorColor: *current_line
+      graphicColor: *purple
+      showIcons: false
+    # YAML info styles.
+    yaml:
+      keyColor: *pink
+      colonColor: *purple
+      valueColor: *foreground
+    # Logs styles.
+    logs:
+      fgColor: *foreground
+      bgColor: *background
+      indicator:
+        fgColor: *foreground
+        bgColor: *purple

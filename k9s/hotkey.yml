@@ -1,5 +1,4 @@
 hotKey:
-  
   shift-q:
     shortCut:    Shift-Q
     description: close
@@ -14,6 +13,11 @@ hotKey:
     shortCut:    Shift-N
     description: change namespace
     command:     ns
+  
+  shift-0:
+    shortCut:    Shift-0
+    description: Viewing nodes
+    command:     nodes
 
   shift-1:
     shortCut:    Shift-1
@@ -29,3 +33,8 @@ hotKey:
     shortCut:    Shift-3
     description: View service
     command:     svc
+  
+  shift-4:
+    shortCut:    Shift-4
+    description: View ingress
+    command:     ingress
