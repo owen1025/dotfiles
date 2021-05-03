@@ -155,6 +155,7 @@ eval $(thefuck --alias)
 [ -f /opt/homebrew/etc/profile.d/autojump.sh ] && . /opt/homebrew/etc/profile.d/autojump.sh
 
 # stern completion
+alias s="stern -A"
 source <(stern --completion=zsh)
 
 # krew environment
