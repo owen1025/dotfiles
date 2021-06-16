@@ -183,11 +183,13 @@ let g:airline_powerline_fonts = 1
 let g:airline_theme = 'bubblegum'
 
 " NERDTree
-let g:NERDTreeWinSize=25
+let g:NERDTreeWinSize=30
 " let g:nerdtree_tabs_open_on_console_startup = 1
 let NERDTreeShowHidden=1
 
 nmap <Leader>q <plug>NERDTreeTabsToggle<CR>
+nmap <C-j> :vertical resize+5<CR>
+nmap <C-k> :vertical resize-5<CR>
 let g:NERDTreeMouseMode = 3
 
 autocmd StdinReadPre * let s:std_in=1
