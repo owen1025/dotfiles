@@ -152,7 +152,7 @@ source ~/.p10k.zsh
 eval $(thefuck --alias)
 
 # autojump
-[ -f /opt/homebrew/etc/profile.d/autojump.sh ] && . /opt/homebrew/etc/profile.d/autojump.sh
+[ -f /usr/local/etc/profile.d/autojump.sh ] && . /usr/local/etc/profile.d/autojump.sh
 
 # stern completion
 alias s="stern -A"
