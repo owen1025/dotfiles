@@ -173,6 +173,9 @@ map <Leader><C-r> :so %<CR>
 " search highlight disable
 map q :nohl<CR>
 
+" Copy current directory name to clipboard
+nnoremap <leader>dp :let @*=expand("%:p:h")<CR>
+
 :vnoremap < <gv
 :vnoremap > >gv
 
