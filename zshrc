@@ -86,9 +86,7 @@ alias v="nvim"
 
 # Custom terraform alias
 alias ti="terraform init"
-alias mti="export AWS_PROFILE=meshtools && terraform init"
 alias tp="terraform plan"
-alias mtp="export AWS_PROFILE=meshtools && terraform plan"
 alias ta="terraform apply"
 alias tc="terraform console"
 alias td="terraform destroy"
@@ -98,6 +96,11 @@ alias tspl="terraform state pull"
 alias tsps="terraform state push"
 alias tsmv="terraform state mv"
 alias tri="terraform import"
+
+# Custom terragrunt alias
+alias tga="terragrunt apply"
+alias tgp="terragrunt plan"
+alias tgd="terragrunt destroy"
 
 # Custom ansible alias
 alias ap="ansible-playbook"
