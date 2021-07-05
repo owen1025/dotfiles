@@ -98,6 +98,8 @@ alias tsmv="terraform state mv"
 alias tri="terraform import"
 
 # Custom terragrunt alias
+alias tg="terragrunt"
+alias tgi="terragrunt init"
 alias tga="terragrunt apply"
 alias tgp="terragrunt plan"
 alias tgd="terragrunt destroy"
