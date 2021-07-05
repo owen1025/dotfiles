@@ -43,6 +43,7 @@ Plug 'mg979/vim-visual-multi', {'branch': 'master'}
 Plug 'pearofducks/ansible-vim'
 Plug 'pangloss/vim-javascript'
 Plug 'fatih/vim-go', { 'do': ':GoUpdateBinaries' }
+Plug 'APZelos/blamer.nvim'
 
 " Initialize plugin system
 call plug#end()
@@ -385,3 +386,7 @@ let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
 let g:fzf_preview_window = ['right:50%', 'ctrl-/']
 map <C-e> :Files<cr>
 map <C-f> :BLines<cr>
+
+" blamer (https://github.com/APZelos/blamer.nvim)
+let g:blamer_enabled = 1
+let g:blamer_delay = 100
