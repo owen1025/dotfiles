@@ -122,6 +122,10 @@ alias ke="kubens"
 alias krb="kubectl run -i --rm --tty busybox --image=busybox -- sh"
 alias krc="kubectl run -i --rm --tty busybox --image=centos:latest -- bash"
 
+alias krh="kubectl rollout history"
+alias krr="kubectl rollout restart"
+alias kru="kubectl rollout undo"
+
 # helm alias
 alias h="helm"
 alias hla="helm list -A"
@@ -136,6 +140,8 @@ alias gei="curl -s http://whatismijnip.nl |cut -d \" \" -f 5"
 alias gzp="ps axo stat,ppid,pid,comm | grep -w defunct"
 # kill zombie processes
 alias kzp="kill $(ps -A -ostat,ppid | awk '/[zZ]/ && !a[$2]++ {print $2}')"
+
+alias vl="export VAULT_ADDR=https://vault.kube-prod-an1.hpcnt.com && vault login -method=oidc role=infra-role-devops"
 
 # fzf setup
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh

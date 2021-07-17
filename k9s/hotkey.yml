@@ -28,13 +28,18 @@ hotKey:
     shortCut:    Shift-2
     description: View deployments
     command:     dp
-
+  
   shift-3:
     shortCut:    Shift-3
+    description: View daemonsets
+    command:     ds
+
+  shift-4:
+    shortCut:    Shift-4
     description: View service
     command:     svc
   
-  shift-4:
-    shortCut:    Shift-4
+  shift-5:
+    shortCut:    Shift-5
     description: View ingress
     command:     ingress
