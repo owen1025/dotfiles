@@ -126,6 +126,9 @@ alias krh="kubectl rollout history"
 alias krr="kubectl rollout restart"
 alias kru="kubectl rollout undo"
 
+alias ktd="kubectl tree deployment"
+alias kts="kubectl tree service"
+
 # helm alias
 alias h="helm"
 alias hla="helm list -A"
@@ -141,11 +144,10 @@ alias gzp="ps axo stat,ppid,pid,comm | grep -w defunct"
 # kill zombie processes
 alias kzp="kill $(ps -A -ostat,ppid | awk '/[zZ]/ && !a[$2]++ {print $2}')"
 
-alias vl="export VAULT_ADDR=https://vault.kube-prod-an1.hpcnt.com && vault login -method=oidc role=infra-role-devops"
 
 # fzf setup
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
-# Always enable preview window on the right with 60% width
+alias f="fzf --preview 'bat --style=numbers --color=always --line-range :500 {}'"
 
 # Custom ENV
 # Setup to python path
@@ -175,5 +177,12 @@ export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
 # awsp alias
 # https://github.com/johnnyopao/awsp
 alias awsp="source _awsp"
+
+# ctags
+alias ctags="`brew --prefix`/bin/ctags"
+
+############# Hyperconnect ################
+alias vl="export VAULT_ADDR=https://vault.kube-prod-an1.hpcnt.com && vault login -method=oidc role=infra-role-devops"
+alias has="hp aws write-credentials --refresh && vl"
 
 autoload -U compinit && compinit -u

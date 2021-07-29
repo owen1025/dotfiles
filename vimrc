@@ -386,7 +386,9 @@ let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
 let g:fzf_preview_window = ['right:50%', 'ctrl-/']
 map <C-e> :Files<cr>
 map <C-f> :BLines<cr>
+map <S-f> :Rg<cr>
+map <C-b> :Buffers<cr>
 
 " blamer (https://github.com/APZelos/blamer.nvim)
 let g:blamer_enabled = 1
-let g:blamer_delay = 100
+let g:blamer_delay = 500
