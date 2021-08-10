@@ -98,6 +98,7 @@ set listchars=tab:\|\
 set list
 set updatetime=100
 set autoread
+au CursorHold * checktime
 set splitright
 set autoindent
 set shiftwidth=4
@@ -186,25 +187,39 @@ let g:airline#extensions#tabline#buffer_nr_show = 1
 let g:airline_powerline_fonts = 1
 let g:airline_theme = 'bubblegum'
 
-" NERDTree
-let g:NERDTreeWinSize=30
+" nerdtree ( https://github.com/preservim/nerdtree )
+let g:NERDTreeWinSize=20
 " let g:nerdtree_tabs_open_on_console_startup = 1
 let NERDTreeShowHidden=1
 
 nmap <Leader>q <plug>NERDTreeTabsToggle<CR>
 nmap <C-j> :vertical resize+5<CR>
 nmap <C-k> :vertical resize-5<CR>
+nnoremap <leader>n :NERDTreeFind<CR>
 let g:NERDTreeMouseMode = 3
 
+" Start NERDTree and put the cursor back in the other window.
 autocmd StdinReadPre * let s:std_in=1
 autocmd VimEnter * if argc() == 0 && !exists("s:std_in") | NERDTree | endif
+
+" Exit Vim if NERDTree is the only window remaining in the only tab.
+autocmd BufEnter * if tabpagenr('$') == 1 && winnr('$') == 1 && exists('b:NERDTree') && b:NERDTree.isTabTree() | quit | endif
+
+" auto refresh
+autocmd BufWritePost * NERDTreeFocus | execute 'normal R' | wincmd p
+
+let g:NERDTreeHighlightFolders = 1 " enables folder icon highlighting using exact match
+let g:NERDTreeHighlightFoldersFullName = 1 " highlights the folder name
+
+let g:NERDTreeAutoCenter=1
+
 
 " indentLine
 let g:indentLine_setColors = 0
 let g:indentLine_char = 'c'
 let g:indentLine_char_list = ['|', '¦', '┆', '┊']
 
-" NERD Commenter
+" nerdcommenter
 " Add spaces after comment delimiters by default
 let g:NERDSpaceDelims = 1
 " Use compact syntax for prettified multi-line comments
@@ -220,13 +235,6 @@ let g:NERDCommentEmptyLines = 1
 " Enable trimming of trailing whitespace when uncommenting
 let g:NERDTrimTrailingWhitespace = 1
 
-" Nerdtree auto refresh
-autocmd BufWritePost * NERDTreeFocus | execute 'normal R' | wincmd p
-
-let g:NERDTreeHighlightFolders = 1 " enables folder icon highlighting using exact match
-let g:NERDTreeHighlightFoldersFullName = 1 " highlights the folder name
-
-let g:NERDTreeAutoCenter=0
 
 " Coc.nvim
 " if hidden is not set, TextEdit might fail.
@@ -383,11 +391,11 @@ let g:ansible_with_keywords_highlight = 'Constant'
 let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
 
 " fzf
-let g:fzf_preview_window = ['right:50%', 'ctrl-/']
+let g:fzf_preview_window = ['right:70%', 'ctrl-/']
 map <C-e> :Files<cr>
 map <C-f> :BLines<cr>
 map <S-f> :Rg<cr>
-map <C-b> :Buffers<cr>
+map <C-x> :Buffers<cr>
 
 " blamer (https://github.com/APZelos/blamer.nvim)
 let g:blamer_enabled = 1
