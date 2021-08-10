@@ -332,3 +332,14 @@ bind a set-window-option synchronize-panes
 
 # reload configuration
 bind u source-file ~/.tmux.conf \; display '~/.tmux.conf reload configuration'
+
+# pane navigation
+unbind Left
+unbind Right
+unbind Up
+unbind Down
+
+bind Left select-pane -L
+bind Down select-pane -D
+bind Up select-pane -U
+bind Right select-pane -R
