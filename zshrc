@@ -129,6 +129,8 @@ alias kru="kubectl rollout undo"
 alias ktd="kubectl tree deployment"
 alias kts="kubectl tree service"
 
+alias kcc="kubectl config current-context"
+
 # helm alias
 alias h="helm"
 alias hla="helm list -A"
