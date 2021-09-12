@@ -304,10 +304,6 @@ autocmd CursorHold * silent call CocActionAsync('highlight')
 " Remap for rename current word
 nmap <leader>rn <Plug>(coc-rename)
 
-" Remap for format selected region
-xmap <leader>f  <Plug>(coc-format-selected)
-nmap <leader>f  <Plug>(coc-format-selected)
-
 augroup mygroup
   autocmd!
   " Setup formatexpr specified filetype(s).
@@ -403,8 +399,9 @@ let g:ansible_with_keywords_highlight = 'Constant'
 let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
 
 " fzf
-let g:fzf_preview_window = ['right:50%', 'ctrl-/']
-map <C-e> :Files<cr>
+set rtp+="$(which fzf)"
+let g:fzf_preview_window = ['right:70%', 'ctrl-/']
+map <C-t> :Files<cr>
 map <C-f> :BLines<cr>
 map <S-f> :Rg<cr>
 map <C-x> :Buffers<cr>
