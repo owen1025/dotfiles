@@ -44,6 +44,7 @@ Plug 'pearofducks/ansible-vim'
 Plug 'pangloss/vim-javascript'
 Plug 'fatih/vim-go', { 'do': ':GoUpdateBinaries' }
 Plug 'APZelos/blamer.nvim'
+Plug 'numirias/semshi', { 'do': ':UpdateRemotePlugins' }
 
 " Initialize plugin system
 call plug#end()
@@ -160,7 +161,7 @@ noremap <S-H> 20h
 noremap <S-L> 20l
 
 map <Leader>z <C-W><Left>
-map <Leader>x <C-W>w
+map <Leader>x <C-w>w
 
 noremap <C-q> :q!<CR>
 
@@ -176,7 +177,8 @@ map <Leader><C-r> :so %<CR>
 map q :nohl<CR>
 
 " Copy current directory name to clipboard
-nnoremap <leader>dp :let @*=expand("%:p:h")<CR>
+nmap cap :let @*=expand("%:p:h")<CR>
+nmap cp :let @+=expand("%")<cr>
 
 :vnoremap < <gv
 :vnoremap > >gv
@@ -365,6 +367,16 @@ nnoremap <silent> <space>k  :<C-u>CocPrev<CR>
 " Resume latest coc list
 nnoremap <silent> <space>p  :<C-u>CocListResume<CR>
 
+let g:coc_global_extensions = [
+    \'coc-markdownlint',
+    \'coc-highlight',
+    \'coc-go',
+    \'coc-pyright',
+    \'coc-json', 
+    \'coc-git',
+    \'coc-yaml',
+\]
+
 " vim-terraform setting
 let g:terraform_align=1
 " let g:terraform_fold_sections=1
@@ -391,7 +403,7 @@ let g:ansible_with_keywords_highlight = 'Constant'
 let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
 
 " fzf
-let g:fzf_preview_window = ['right:70%', 'ctrl-/']
+let g:fzf_preview_window = ['right:50%', 'ctrl-/']
 map <C-e> :Files<cr>
 map <C-f> :BLines<cr>
 map <S-f> :Rg<cr>
