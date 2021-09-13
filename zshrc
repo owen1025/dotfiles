@@ -68,6 +68,7 @@ alias ga="git add --all"
 alias gp="git push"
 alias gct="git checkout"
 alias gm="git merge"
+alias gh="open `git remote -v | grep fetch | awk '{print $2}' | sed 's/git@/http:\/\//' | sed 's/com:/com\//'`| head -n1"
 
 # Custom tmux alias
 alias tx="tmux -2 -u"
