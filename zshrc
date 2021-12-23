@@ -184,5 +184,6 @@ alias ctags="`brew --prefix`/bin/ctags"
 ############# Hyperconnect ################
 alias vl="export VAULT_ADDR=https://vault.kube-prod-an1.hpcnt.com && vault login -method=oidc role=infra-role-devops"
 alias has="hp aws write-credentials --refresh && vl"
+alias kgn="kubectl get nodes -L node.hpcnt.com/role -L node.hpcnt.com/service -L node.hpcnt.com/stack -L node.hpcnt.com/duty -L node.hpcnt.com/hardware -L node.hpcnt.com/lifecycle -L node.hpcnt.com/os -L node.kubernetes.io/instance-type -L kubernetes.io/arch -L topology.kubernetes.io/zone -L vpc.amazonaws.com/has-trunk-attached"
 
 autoload -U compinit && compinit -u

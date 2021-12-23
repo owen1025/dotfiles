@@ -44,45 +44,13 @@ Plug 'pearofducks/ansible-vim'
 Plug 'pangloss/vim-javascript'
 Plug 'fatih/vim-go', { 'do': ':GoUpdateBinaries' }
 Plug 'APZelos/blamer.nvim'
-Plug 'numirias/semshi', { 'do': ':UpdateRemotePlugins' }
+Plug 'tiagofumo/vim-nerdtree-syntax-highlight'
+Plug 'nvim-lua/plenary.nvim'
+Plug 'sindrets/diffview.nvim'
 
 " Initialize plugin system
 call plug#end()
 " ####################### vim-plug stop ####################### 
-
-" ####################### Neobundle start ####################### 
-" Note: Skip initialization for vim-tiny or vim-small.
-if 0 | endif
-
-if &compatible
-  set nocompatible               " Be iMproved
-endif
-
-" Required:
-set runtimepath+=~/.vim/bundle/neobundle.vim/
-
-" Required:
-call neobundle#begin(expand('~/.vim/bundle/'))
-
-" Let NeoBundle manage NeoBundle
-" Required:
-NeoBundleFetch 'Shougo/neobundle.vim'
-
-" My Bundles here:
-" Refer to |:NeoBundle-examples|.
-" Note: You don't set neobundle setting in .gvimrc!
-
-NeoBundle 'tiagofumo/vim-nerdtree-syntax-highlight'
-
-call neobundle#end()
-
-" Required:
-filetype plugin indent on
-
-" If there are uninstalled bundles found on startup,
-" this will conveniently prompt you to install them.
-NeoBundleCheck
-" ####################### Neobundle stop ####################### 
 
 " ####################### Owen config start #######################
 
@@ -375,19 +343,14 @@ let g:coc_global_extensions = [
 
 " vim-terraform setting
 let g:terraform_align=1
-" let g:terraform_fold_sections=1
+let g:terraform_fold_sections=1
 " let g:terraform_fmt_on_save=1
 
 " vim-easymotion setting
-" <Leader>f{char} to move to {char}
-map  <Leader>f <Plug>(easymotion-bd-f)
-nmap <Leader>f <Plug>(easymotion-overwin-f)
+map  f <Plug>(easymotion-bd-f)
+nmap f <Plug>(easymotion-overwin-f)
 " s{char}{char} to move to {char}{char}
 nmap s <Plug>(easymotion-overwin-f2)
-
-" Move to line
-map <Leader>L <Plug>(easymotion-bd-jk)
-nmap <Leader>L <Plug>(easymotion-overwin-line)
 
 " vim-ansible set up
 let g:ansible_unindent_after_newline = 1
