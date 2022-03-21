@@ -181,6 +181,11 @@ alias awsp="source _awsp"
 # ctags
 alias ctags="`brew --prefix`/bin/ctags"
 
+# nvm
+export NVM_DIR="$HOME/.nvm"
+[ -s "/usr/local/opt/nvm/nvm.sh" ] && \. "/usr/local/opt/nvm/nvm.sh"  # This loads nvm
+[ -s "/usr/local/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/usr/local/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
+
 ############# Hyperconnect ################
 alias vl="export VAULT_ADDR=https://vault.kube-prod-an1.hpcnt.com && vault login -method=oidc role=infra-role-devops"
 alias has="hp aws write-credentials --refresh && vl"

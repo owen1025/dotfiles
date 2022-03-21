@@ -47,6 +47,8 @@ Plug 'APZelos/blamer.nvim'
 Plug 'tiagofumo/vim-nerdtree-syntax-highlight'
 Plug 'nvim-lua/plenary.nvim'
 Plug 'sindrets/diffview.nvim'
+Plug 't9md/vim-choosewin'
+Plug 'weilbith/nerdtree_choosewin-plugin'
 
 " Initialize plugin system
 call plug#end()
@@ -339,6 +341,7 @@ let g:coc_global_extensions = [
     \'coc-json', 
     \'coc-git',
     \'coc-yaml',
+    \'coc-tsserver'
 \]
 
 " vim-terraform setting
@@ -372,3 +375,11 @@ map <C-x> :Buffers<cr>
 " blamer (https://github.com/APZelos/blamer.nvim)
 let g:blamer_enabled = 1
 let g:blamer_delay = 500
+
+" diffview ( https://github.com/sindrets/diffview.nvim )
+nmap vd :DiffviewOpen<cr>
+nmap cd :DiffviewClose<cr>
+
+" vim-choosewin ( https://github.com/t9md/vim-choosewin )
+nmap - <Plug>(choosewin)
+let g:choosewin_overlay_enable = 1
