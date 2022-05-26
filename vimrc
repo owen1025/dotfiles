@@ -160,7 +160,7 @@ let g:airline_powerline_fonts = 1
 let g:airline_theme = 'bubblegum'
 
 " nerdtree ( https://github.com/preservim/nerdtree )
-let g:NERDTreeWinSize=20
+let g:NERDTreeWinSize=30
 " let g:nerdtree_tabs_open_on_console_startup = 1
 let NERDTreeShowHidden=1
 
