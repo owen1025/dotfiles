@@ -9,6 +9,7 @@ plugins=(
   kubectl
   sudo
   asdf
+  zsh-kubecolor
 )
 
 source $ZSH/oh-my-zsh.sh
@@ -117,6 +118,8 @@ alias kde="kubectl describe"
 alias kgl="kubectl logs -f"
 alias ket="kubectl exec -it"
 alias kpf="kubectl port-forward"
+alias kgp="kubectl get pods -o wide"
+alias kge="kubectl get events --sort-by=.metadata.creationTimestamp"
 
 alias kx="kubectx"
 alias ke="kubens"
@@ -192,9 +195,18 @@ alias kubectl=kubecolor
 # make completion work with kubecolor
 compdef kubecolor=kubectl
 
+# Add GOPATH env 
+export GOPATH=$HOME/go 
+export GOBIN=$HOME/go/bin 
+export PATH=$PATH:/usr/local/go/bin:$(go env GOBIN)
+
 ############# Hyperconnect ################
 alias vl="export VAULT_ADDR=https://vault.kube-prod-an1.hpcnt.com && vault login -method=oidc role=infra-role-devops"
-alias has="hp aws write-credentials --refresh && vl"
+alias has="hp aws write-credentials --use-cache && vl"
 alias kgn="kubectl get nodes -L node.hpcnt.com/role -L node.hpcnt.com/service -L node.hpcnt.com/stack -L node.hpcnt.com/duty -L node.hpcnt.com/hardware -L node.hpcnt.com/lifecycle -L node.hpcnt.com/os -L node.kubernetes.io/instance-type -L kubernetes.io/arch -L topology.kubernetes.io/zone -L vpc.amazonaws.com/has-trunk-attached"
 
 autoload -U compinit && compinit -u
+
+# start: this install hp-cli
+eval "$(hp shell init)"
+# end: this install hp-cli

@@ -49,6 +49,7 @@ Plug 'nvim-lua/plenary.nvim'
 Plug 'sindrets/diffview.nvim'
 Plug 't9md/vim-choosewin'
 Plug 'weilbith/nerdtree_choosewin-plugin'
+Plug 'sheerun/vim-polyglot'
 
 " Initialize plugin system
 call plug#end()
@@ -91,6 +92,7 @@ set nocursorline
 autocmd FileType yaml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType yml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType toml setlocal ts=2 sts=2 sw=2 expandtab
+autocmd FileType go setlocal ts=4 sts=4 sw=4 expandtab
 
 au BufNewFile,BufRead Jenkinsfile setf groovy " Jenkinsfile syntax on
 
@@ -160,7 +162,7 @@ let g:airline_powerline_fonts = 1
 let g:airline_theme = 'bubblegum'
 
 " nerdtree ( https://github.com/preservim/nerdtree )
-let g:NERDTreeWinSize=30
+let g:NERDTreeWinSize=25
 " let g:nerdtree_tabs_open_on_console_startup = 1
 let NERDTreeShowHidden=1
 
@@ -383,3 +385,7 @@ nmap cd :DiffviewClose<cr>
 " vim-choosewin ( https://github.com/t9md/vim-choosewin )
 nmap - <Plug>(choosewin)
 let g:choosewin_overlay_enable = 1
+
+" vim-go
+let g:go_def_mode='gopls'
+let g:go_info_mode='gopls'
