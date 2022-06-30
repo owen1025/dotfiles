@@ -93,6 +93,8 @@ autocmd FileType yaml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType yml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType toml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType go setlocal ts=4 sts=4 sw=4 expandtab
+autocmd FileType go set list lcs=tab:\┊\ "(last character is a space...)
+autocmd FileType go hi SpecialKey ctermfg=gray
 
 au BufNewFile,BufRead Jenkinsfile setf groovy " Jenkinsfile syntax on
 
@@ -189,6 +191,7 @@ let g:NERDTreeAutoCenter=1
 
 
 " indentLine
+let g:indentLine_color_term = 239
 let g:indentLine_setColors = 0
 let g:indentLine_char = 'c'
 let g:indentLine_char_list = ['|', '¦', '┆', '┊']
@@ -389,3 +392,13 @@ let g:choosewin_overlay_enable = 1
 " vim-go
 let g:go_def_mode='gopls'
 let g:go_info_mode='gopls'
+
+let g:go_fmt_command = "goimports"
+let g:go_autodetect_gopath = 1
+let g:go_list_type = "quickfix"
+let g:go_highlight_types = 1
+let g:go_highlight_fields = 1
+let g:go_highlight_functions = 1
+let g:go_highlight_function_calls = 1
+let g:go_highlight_extra_types = 1
+let g:go_highlight_generate_tags = 1
