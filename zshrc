@@ -136,6 +136,8 @@ alias kts="kubectl tree service"
 
 alias kcc="kubectl config current-context"
 
+alias kdn="kubectl drain node --ignore-daemonsets --delete-emptydir-data"
+
 # helm alias
 alias h="helm"
 alias hla="helm list -A"
@@ -190,8 +192,8 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "/usr/local/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/usr/local/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
 
 # kubecolor
-source <(kubectl completion zsh)
-alias kubectl=kubecolor
+# source <(kubectl completion zsh)
+alias kubectl="kubecolor --force-colors"
 # make completion work with kubecolor
 compdef kubecolor=kubectl
 
