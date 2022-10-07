@@ -15,16 +15,19 @@
         "command": "terraform-ls",
         "args": ["serve"],
         "filetypes": [
-                "terraform",
-                "tf"
+            "terraform",
+            "tf"
         ],
         "initializationOptions": {},
         "settings": {}
       },
-      "golang": {
+        "golang": {
           "command": "gopls",
           "rootPatterns": ["go.mod", ".vim/", ".git/", ".hg/"],
           "filetypes": ["go"]
         }
-    }    
+    },    
+    "yaml.schemas": {
+      "kubernetes": "/*.yaml"
+    }
 }
