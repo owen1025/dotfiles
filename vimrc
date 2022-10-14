@@ -50,6 +50,7 @@ Plug 'sindrets/diffview.nvim'
 Plug 't9md/vim-choosewin'
 Plug 'sheerun/vim-polyglot'
 Plug 'antoinemadec/coc-fzf'
+Plug 'brooth/far.vim'
 
 " Initialize plugin system
 call plug#end()
