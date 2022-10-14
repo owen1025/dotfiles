@@ -48,8 +48,8 @@ Plug 'tiagofumo/vim-nerdtree-syntax-highlight'
 Plug 'nvim-lua/plenary.nvim'
 Plug 'sindrets/diffview.nvim'
 Plug 't9md/vim-choosewin'
-Plug 'weilbith/nerdtree_choosewin-plugin'
 Plug 'sheerun/vim-polyglot'
+Plug 'antoinemadec/coc-fzf'
 
 " Initialize plugin system
 call plug#end()
@@ -167,7 +167,6 @@ let g:airline_theme = 'bubblegum'
 let g:NERDTreeWinSize=25
 " let g:nerdtree_tabs_open_on_console_startup = 1
 let NERDTreeShowHidden=1
-
 nmap <Leader>q <plug>NERDTreeTabsToggle<CR>
 nmap <C-j> :vertical resize+5<CR>
 nmap <C-k> :vertical resize-5<CR>
@@ -258,7 +257,7 @@ nmap <silent> [g <Plug>(coc-diagnostic-prev)
 nmap <silent> ]g <Plug>(coc-diagnostic-next)
 
 " GoTo code navigation.
-nmap <silent> gd <Plug>(coc-definition)
+nmap <silent> gt :call CocAction('jumpDefinition', 'vsplit')<CR>
 nmap <silent> gy <Plug>(coc-type-definition)
 nmap <silent> gi <Plug>(coc-implementation)
 nmap <silent> gr <Plug>(coc-references)
@@ -371,7 +370,8 @@ let g:coc_global_extensions = [
     \'coc-json', 
     \'coc-git',
     \'coc-yaml',
-    \'coc-tsserver'
+    \'coc-tsserver',
+    \'coc-marketplace'
 \]
 
 " vim-terraform setting
@@ -436,3 +436,7 @@ au FileType go nmap <leader>c <Plug>(go-coverage-toggle)
 au FileType go nmap <Leader>e <Plug>(go-rename)
 au FileType go nmap <Leader>s <Plug>(go-implements)
 au FileType go nmap <Leader>i <Plug>(go-info)
+
+" Far.vim
+let g:far#enable_undo=1
+au FileType far_vim map <buffer><silent>q :bw<cr>
