@@ -10,6 +10,7 @@ plugins=(
   sudo
   asdf
   zsh-kubecolor
+  autojump
 )
 
 source $ZSH/oh-my-zsh.sh
@@ -25,11 +26,8 @@ antigen bundle command-not-found
 
 # Syntax highlighting bundle.
 antigen bundle zsh-users/zsh-syntax-highlighting
-
 antigen bundle zsh-users/zsh-autosuggestions
-
 antigen bundle zsh-users/zsh-completions
-
 # Load the theme.
 antigen theme romkatv/powerlevel10k
 
@@ -192,23 +190,18 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "/usr/local/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/usr/local/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
 
 # kubecolor
-# source <(kubectl completion zsh)
+source <(kubectl completion zsh)
 alias kubectl="kubecolor --force-colors"
-# make completion work with kubecolor
-compdef kubecolor=kubectl
+alias k="kubecolor"
+complete -o default -F __start_kubectl kubecolor
 
 # Add GOPATH env 
 export GOPATH=$HOME/go 
 export GOBIN=$HOME/go/bin 
 export PATH=$PATH:/usr/local/go/bin:$(go env GOBIN)
 
-############# Hyperconnect ################
-alias vl="export VAULT_ADDR=https://vault.kube-prod-an1.hpcnt.com && vault login -method=oidc role=infra-role-devops"
-alias has="hp aws write-credentials --use-cache && vl"
-alias kgn="kubectl get nodes -L node.hpcnt.com/role -L node.hpcnt.com/service -L node.hpcnt.com/stack -L node.hpcnt.com/duty -L node.hpcnt.com/hardware -L node.hpcnt.com/lifecycle -L node.hpcnt.com/os -L node.kubernetes.io/instance-type -L kubernetes.io/arch -L topology.kubernetes.io/zone -L vpc.amazonaws.com/has-trunk-attached"
+# python3
+alias python="python3"
+alias pip="pip3"
 
 autoload -U compinit && compinit -u
-
-# start: this install hp-cli
-eval "$(hp shell init)"
-# end: this install hp-cli

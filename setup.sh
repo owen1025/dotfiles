@@ -40,6 +40,9 @@ source ~/.zshrc
 # install tmux plugins
 git clone https://github.com/tmux-plugins/tmux-resurrect ~/clone/path
 
+# install zsh-kubecolor
+git clone https://github.com/devopstales/zsh-kubecolor.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-kubecolor
+
 # Install a vim plugin manager(Vundle, vim-plug, Neobundle)
 git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
 curl -fLo ~/.local/share/nvim/site/autoload/plug.vim --create-dirs \

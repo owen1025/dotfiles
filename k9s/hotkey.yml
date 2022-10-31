@@ -4,42 +4,7 @@ hotKey:
     description: close
     command:     quit
   
-  shift-c:
-    shortCut:    Shift-C
-    description: change ctx
-    command:     ctx
-  
-  shift-n:
-    shortCut:    Shift-N
-    description: change namespace
-    command:     ns
-  
-  shift-0:
-    shortCut:    Shift-0
-    description: Viewing nodes
-    command:     nodes
-
-  shift-1:
-    shortCut:    Shift-1
-    description: Viewing pods
-    command:     pods
-
-  shift-2:
-    shortCut:    Shift-2
-    description: View deployments
-    command:     dp
-  
-  shift-3:
-    shortCut:    Shift-3
-    description: View daemonsets
-    command:     ds
-
-  shift-4:
-    shortCut:    Shift-4
-    description: View service
-    command:     svc
-  
-  shift-5:
-    shortCut:    Shift-5
-    description: View ingress
-    command:     ingress
+  shift-q:
+    shortCut:    Shift-D
+    description: delete
+    command:     delete
