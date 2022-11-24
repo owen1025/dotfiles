@@ -10,7 +10,6 @@ call vundle#begin()
 Plugin 'VundleVim/Vundle.vim'
 Plugin 'vim-airline/vim-airline'
 Plugin 'vim-airline/vim-airline-themes'
-Plugin 'scrooloose/nerdtree'
 Plugin 'jistr/vim-nerdtree-tabs'
 Plugin 'Xuyuanp/nerdtree-git-plugin'
 Plugin 'Yggdroot/indentLine'
@@ -30,6 +29,7 @@ filetype plugin indent on" required
 " ####################### vim-plug start #######################
 call plug#begin('~/.vim/plugged')
 
+Plug 'preservim/nerdtree'
 Plug 'junegunn/fzf', { 'dir': '~/.fzf', 'do': './install --bin' }
 Plug 'junegunn/fzf.vim'
 Plug 'ryanoasis/vim-devicons'
@@ -69,13 +69,14 @@ set nowritebackup
 set noswapfile
 set listchars=tab:\|\
 set list
-set updatetime=100
+set updatetime=300
 set autoread
 au CursorHold * checktime
 set splitright
 set autoindent
 set shiftwidth=4
-set softtabstop=4 expandtab
+set softtabstop=4 
+set expandtab
 set fencs=ucs-bom,utf-8,euc-kr.latin1 " 한글 파일은 euc-kr로, 유니코드는 유니코드로
 set fileencoding=utf-8 " 파일저장인코딩
 set tenc=utf-8
@@ -89,13 +90,17 @@ set clipboard=unnamed " use OS clipboard
 set nolazyredraw
 set ttyfast
 set nocursorline
+" set paste
+set nosmartindent
 
 autocmd FileType yaml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType yml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType toml setlocal ts=2 sts=2 sw=2 expandtab
+autocmd FileType hcl setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType go setlocal ts=4 sts=4 sw=4 expandtab
 autocmd FileType go set list lcs=tab:\┊\ "(last character is a space...)
 autocmd FileType go hi SpecialKey ctermfg=gray
+autocmd FileType python let b:coc_root_patterns = ['.git', '.env']
 
 au BufNewFile,BufRead Jenkinsfile setf groovy " Jenkinsfile syntax on
 
@@ -169,6 +174,7 @@ let g:NERDTreeWinSize=25
 " let g:nerdtree_tabs_open_on_console_startup = 1
 let NERDTreeShowHidden=1
 nmap <Leader>q <plug>NERDTreeTabsToggle<CR>
+nmap <Leader>r :NERDTreeFocus<cr>R<c-w><c-p>
 nmap <C-j> :vertical resize+5<CR>
 nmap <C-k> :vertical resize-5<CR>
 nnoremap <leader>n :NERDTreeFind<CR>
@@ -212,14 +218,6 @@ let g:NERDCommentEmptyLines = 1
 " Enable trimming of trailing whitespace when uncommenting
 let g:NERDTrimTrailingWhitespace = 1
 
-" Some servers have issues with backup files, see #649.
-set nobackup
-set nowritebackup
-
-" Having longer updatetime (default is 4000 ms = 4 s) leads to noticeable
-" delays and poor user experience.
-set updatetime=300
-
 " Always show the signcolumn, otherwise it would shift the text each time
 " diagnostics appear/become resolved.
 set signcolumn=yes
@@ -229,17 +227,17 @@ set signcolumn=yes
 " no select by `"suggest.noselect": true` in your configuration file.
 " NOTE: Use command ':verbose imap <tab>' to make sure tab is not mapped by
 " other plugin before putting this into your config.
-" inoremap <silent><expr> <TAB>
-"       \ coc#pum#visible() ? coc#pum#next(1) :
-"       \ CheckBackspace() ? "\<Tab>" :
-"       \ coc#refresh()
-" inoremap <expr><S-TAB> coc#pum#visible() ? coc#pum#prev(1) : "\<C-h>"
+inoremap <silent><expr> <TAB>
+      \ coc#pum#visible() ? coc#pum#next(1) :
+      \ CheckBackspace() ? "\<Tab>" :
+      \ coc#refresh()
+inoremap <expr><S-TAB> coc#pum#visible() ? coc#pum#prev(1) : "\<C-h>"
 
 " Make <CR> to accept selected completion item or notify coc.nvim to format
 " <C-g>u breaks current undo, please make your own choice.
-inoremap <silent><expr> <CR> coc#pum#visible() ? coc#pum#confirm()
-                              \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
 inoremap <silent><expr> <TAB> coc#pum#visible() ? coc#pum#confirm()
+                              \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
+inoremap <silent><expr> <CR> coc#pum#visible() ? coc#pum#confirm()
                               \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
 
 function! CheckBackspace() abort
@@ -328,11 +326,6 @@ if has('nvim-0.4.0') || has('patch-8.2.0750')
   vnoremap <silent><nowait><expr> <C-b> coc#float#has_scroll() ? coc#float#scroll(0) : "\<C-b>"
 endif
 
-" Use CTRL-S for selections ranges.
-" Requires 'textDocument/selectionRange' support of language server.
-" nmap <silent> <C-s> <Plug>(coc-range-select)
-" xmap <silent> <C-s> <Plug>(coc-range-select)
-
 " Add `:Format` command to format current buffer.
 command! -nargs=0 Format :call CocActionAsync('format')
 
@@ -379,8 +372,8 @@ let g:coc_global_extensions = [
 
 " vim-terraform setting
 let g:terraform_align=1
-let g:terraform_fold_sections=1
-" let g:terraform_fmt_on_save=1
+let g:terraform_fold_sections=0
+let g:terraform_fmt_on_save=1
 
 " vim-easymotion setting
 map  f <Plug>(easymotion-bd-f)
