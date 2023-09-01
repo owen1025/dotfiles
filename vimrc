@@ -42,7 +42,6 @@ Plug 'neoclide/coc.nvim', {'branch': 'release'}
 Plug 'mg979/vim-visual-multi', {'branch': 'master'}
 Plug 'pearofducks/ansible-vim'
 Plug 'pangloss/vim-javascript'
-Plug 'fatih/vim-go', { 'do': ':GoUpdateBinaries' }
 Plug 'APZelos/blamer.nvim'
 Plug 'tiagofumo/vim-nerdtree-syntax-highlight'
 Plug 'nvim-lua/plenary.nvim'
@@ -239,6 +238,7 @@ inoremap <silent><expr> <TAB> coc#pum#visible() ? coc#pum#confirm()
                               \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
 inoremap <silent><expr> <CR> coc#pum#visible() ? coc#pum#confirm()
                               \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
+inoremap <silent><expr> <c-space> coc#refresh()
 
 function! CheckBackspace() abort
   let col = col('.') - 1
@@ -392,7 +392,7 @@ let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
 
 " fzf
 set rtp+="$(which fzf)"
-let g:fzf_preview_window = ['right:70%', 'ctrl-/']
+let g:fzf_preview_window = ['right:50%', 'ctrl-/']
 map <C-t> :Files<cr>
 map <C-f> :BLines<cr>
 map <S-f> :Rg<cr>
@@ -436,3 +436,11 @@ au FileType go nmap <Leader>i <Plug>(go-info)
 " Far.vim
 let g:far#enable_undo=1
 au FileType far_vim map <buffer><silent>q :bw<cr>
+
+" normal mode에서 G를 눌렀을 때 커서를 텍스트 끝으로 이동하는 vimrc 설정 추가
+nnoremap T $
+
+" copilot
+imap <silent> <C-u> <Plug>(copilot-next)
+imap <silent> <C-i> <Plug>(copilot-previous)
+imap <silent> <C-o> <Plug>(copilot-dismiss)

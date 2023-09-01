@@ -118,6 +118,7 @@ alias ket="kubectl exec -it"
 alias kpf="kubectl port-forward"
 alias kgp="kubectl get pods -o wide"
 alias kge="kubectl get events --sort-by=.metadata.creationTimestamp"
+alias kgn="kubectl get nodes -L beta.kubernetes.io/instance-type -L node.carpenstreet.com/type -L beta.kubernetes.io/arch -L node.carpenstreet.com/hardware"
 
 alias kx="kubectx"
 alias ke="kubens"
@@ -177,6 +178,9 @@ source <(stern --completion=zsh)
 # krew environment
 export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
 
+# k9s
+alias k9s="export XDG_CONFIG_HOME=~ && k9s"
+
 # awsp alias
 # https://github.com/johnnyopao/awsp
 alias awsp="source _awsp"
@@ -184,10 +188,9 @@ alias awsp="source _awsp"
 # ctags
 alias ctags="`brew --prefix`/bin/ctags"
 
-# nvm
 export NVM_DIR="$HOME/.nvm"
-[ -s "/usr/local/opt/nvm/nvm.sh" ] && \. "/usr/local/opt/nvm/nvm.sh"  # This loads nvm
-[ -s "/usr/local/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/usr/local/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 # kubecolor
 source <(kubectl completion zsh)
@@ -205,3 +208,6 @@ alias python="python3"
 alias pip="pip3"
 
 autoload -U compinit && compinit -u
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+source /Users/owen/.config/broot/launcher/bash/br
