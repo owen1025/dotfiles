@@ -5,9 +5,15 @@ k9s:
         - NAMESPACE
         - NAME
         - STATUS
-        - NODE
         - CPU
         - MEMORY
-        # - AGE
-        # - IP
-        # - READY
+        - AGE
+        - IP
+        - NODE
+    v1/nodes:
+      columns:
+        - NAME
+        - STATUS
+        - VERSION
+        - PODS
+        - AGE

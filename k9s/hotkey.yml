@@ -4,7 +4,7 @@ hotKey:
     description: close
     command:     quit
   
-  shift-q:
+  shift-d:
     shortCut:    Shift-D
-    description: delete
-    command:     delete
+    description: Delete
+    command:     Delete
