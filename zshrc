@@ -192,11 +192,6 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
-# kubecolor
-source <(kubectl completion zsh)
-alias kubectl="kubecolor --force-colors"
-alias k="kubecolor"
-complete -o default -F __start_kubectl kubecolor
 
 # Add GOPATH env 
 export GOPATH=$HOME/go 
@@ -211,3 +206,10 @@ autoload -U compinit && compinit -u
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 source /Users/owen/.config/broot/launcher/bash/br
+
+# kubecolor
+source <(kubectl completion zsh)
+alias kubectl="kubecolor --force-colors"
+alias k="kubecolor"
+# complete -o default -F __start_kubectl kubecolor
+compdef kubecolor=kubectl
