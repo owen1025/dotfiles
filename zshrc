@@ -4,13 +4,12 @@ export TERM="xterm-256color"
 export ZSH="${HOME}/.oh-my-zsh"
 
 plugins=(
-  fasd
-  aws
-  kubectl
-  sudo
-  asdf
-  zsh-kubecolor
-  autojump
+    fasd
+    aws
+    kubectl
+    sudo
+    asdf
+    autojump
 )
 
 source $ZSH/oh-my-zsh.sh
@@ -38,7 +37,7 @@ antigen apply
 ttyctl -f
 
 # Custom common alias
-alias la="exa -al"
+alias la="lsd -al"
 
 # Custom brew alias
 alias bi="brew install"
@@ -156,7 +155,7 @@ alias kzp="kill $(ps -A -ostat,ppid | awk '/[zZ]/ && !a[$2]++ {print $2}')"
 alias f="fzf --preview 'bat --style=numbers --color=always --line-range :500 {}'"
 export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+source <(fzf --zsh)
 
 # Custom ENV
 export EDITOR="nvim"
@@ -193,9 +192,9 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 
-# Add GOPATH env 
-export GOPATH=$HOME/go 
-export GOBIN=$HOME/go/bin 
+# Add GOPATH env
+export GOPATH=$HOME/go
+export GOBIN=$HOME/go/bin
 export PATH=$PATH:/usr/local/go/bin:$(go env GOBIN)
 
 # python3
@@ -205,11 +204,16 @@ alias pip="pip3"
 autoload -U compinit && compinit -u
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
-source /Users/owen/.config/broot/launcher/bash/br
-
 # kubecolor
 source <(kubectl completion zsh)
 alias kubectl="kubecolor --force-colors"
 alias k="kubecolor"
 # complete -o default -F __start_kubectl kubecolor
 compdef kubecolor=kubectl
+
+export ANDROID_HOME=$HOME/Library/Android/sdk
+export PATH=$PATH:$ANDROID_HOME/emulator
+export PATH=$PATH:$ANDROID_HOME/tools
+export PATH=$PATH:$ANDROID_HOME/tools/bin
+export PATH=$PATH:$ANDROID_HOME/platform-tools
+export UV_USE_IO_URING=0

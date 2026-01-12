@@ -1,5 +1,5 @@
 " ################## Vim Plugin management #######################
-" 
+"
 " ####################### Vundle start #######################
 set nocompatible              " be iMproved, required
 filetype off                  " required
@@ -21,6 +21,7 @@ Plugin 'leafgarland/typescript-vim'
 Plugin 'hashivim/vim-terraform'
 Plugin 'easymotion/vim-easymotion'
 Plugin 'tpope/vim-surround'
+Plugin 'vim-autoformat/vim-autoformat'
 
 call vundle#end()            " required
 filetype plugin indent on" required
@@ -50,10 +51,11 @@ Plug 't9md/vim-choosewin'
 Plug 'sheerun/vim-polyglot'
 Plug 'antoinemadec/coc-fzf'
 Plug 'brooth/far.vim'
+Plug 'madox2/vim-ai'
 
 " Initialize plugin system
 call plug#end()
-" ####################### vim-plug stop ####################### 
+" ####################### vim-plug stop #######################
 
 " ####################### Owen config start #######################
 
@@ -74,7 +76,7 @@ au CursorHold * checktime
 set splitright
 set autoindent
 set shiftwidth=4
-set softtabstop=4 
+set softtabstop=4
 set expandtab
 set fencs=ucs-bom,utf-8,euc-kr.latin1 " 한글 파일은 euc-kr로, 유니코드는 유니코드로
 set fileencoding=utf-8 " 파일저장인코딩
@@ -91,6 +93,7 @@ set ttyfast
 set nocursorline
 " set paste
 set nosmartindent
+au BufWrite * :Autoformat
 
 autocmd FileType yaml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType yml setlocal ts=2 sts=2 sw=2 expandtab
@@ -99,13 +102,12 @@ autocmd FileType hcl setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType go setlocal ts=4 sts=4 sw=4 expandtab
 autocmd FileType go set list lcs=tab:\┊\ "(last character is a space...)
 autocmd FileType go hi SpecialKey ctermfg=gray
-autocmd FileType python let b:coc_root_patterns = ['.git', '.env']
-
+autocmd FileType python let b:coc_root_patterns = ['.git', '.env', 'venv', '.venv', 'setup.cfg', 'setup.py', 'pyproject.toml', 'pyrightconfig.json']
 au BufNewFile,BufRead Jenkinsfile setf groovy " Jenkinsfile syntax on
 
 " For Neovim 0.1.3 and 0.1.4 - https://github.com/neovim/neovim/pull/2198
 if (has('nvim'))
-  let $NVIM_TUI_ENABLE_TRUE_COLOR = 1
+    let $NVIM_TUI_ENABLE_TRUE_COLOR = 1
 endif
 
 syntax on
@@ -227,29 +229,29 @@ set signcolumn=yes
 " NOTE: Use command ':verbose imap <tab>' to make sure tab is not mapped by
 " other plugin before putting this into your config.
 inoremap <silent><expr> <TAB>
-      \ coc#pum#visible() ? coc#pum#next(1) :
-      \ CheckBackspace() ? "\<Tab>" :
-      \ coc#refresh()
+            \ coc#pum#visible() ? coc#pum#next(1) :
+            \ CheckBackspace() ? "\<Tab>" :
+            \ coc#refresh()
 inoremap <expr><S-TAB> coc#pum#visible() ? coc#pum#prev(1) : "\<C-h>"
 
 " Make <CR> to accept selected completion item or notify coc.nvim to format
 " <C-g>u breaks current undo, please make your own choice.
 inoremap <silent><expr> <TAB> coc#pum#visible() ? coc#pum#confirm()
-                              \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
+            \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
 inoremap <silent><expr> <CR> coc#pum#visible() ? coc#pum#confirm()
-                              \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
+            \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
 inoremap <silent><expr> <c-space> coc#refresh()
 
 function! CheckBackspace() abort
-  let col = col('.') - 1
-  return !col || getline('.')[col - 1]  =~# '\s'
+    let col = col('.') - 1
+    return !col || getline('.')[col - 1]  =~# '\s'
 endfunction
 
 " Use <c-space> to trigger completion.
 if has('nvim')
-  inoremap <silent><expr> <c-space> coc#refresh()
+    inoremap <silent><expr> <c-space> coc#refresh()
 else
-  inoremap <silent><expr> <c-@> coc#refresh()
+    inoremap <silent><expr> <c-@> coc#refresh()
 endif
 
 " Use `[g` and `]g` to navigate diagnostics
@@ -267,11 +269,11 @@ nmap <silent> gr <Plug>(coc-references)
 nnoremap <silent> K :call ShowDocumentation()<CR>
 
 function! ShowDocumentation()
-  if CocAction('hasProvider', 'hover')
-    call CocActionAsync('doHover')
-  else
-    call feedkeys('K', 'in')
-  endif
+    if CocAction('hasProvider', 'hover')
+        call CocActionAsync('doHover')
+    else
+        call feedkeys('K', 'in')
+    endif
 endfunction
 
 " Highlight the symbol and its references when holding the cursor.
@@ -285,11 +287,11 @@ xmap <leader>f  <Plug>(coc-format-selected)
 nmap <leader>f  <Plug>(coc-format-selected)
 
 augroup mygroup
-  autocmd!
-  " Setup formatexpr specified filetype(s).
-  autocmd FileType typescript,json setl formatexpr=CocAction('formatSelected')
-  " Update signature help on jump placeholder.
-  autocmd User CocJumpPlaceholder call CocActionAsync('showSignatureHelp')
+    autocmd!
+    " Setup formatexpr specified filetype(s).
+    autocmd FileType typescript,json setl formatexpr=CocAction('formatSelected')
+    " Update signature help on jump placeholder.
+    autocmd User CocJumpPlaceholder call CocActionAsync('showSignatureHelp')
 augroup end
 
 " Applying codeAction to the selected region.
@@ -318,12 +320,12 @@ omap ac <Plug>(coc-classobj-a)
 
 " Remap <C-f> and <C-b> for scroll float windows/popups.
 if has('nvim-0.4.0') || has('patch-8.2.0750')
-  nnoremap <silent><nowait><expr> <C-f> coc#float#has_scroll() ? coc#float#scroll(1) : "\<C-f>"
-  nnoremap <silent><nowait><expr> <C-b> coc#float#has_scroll() ? coc#float#scroll(0) : "\<C-b>"
-  inoremap <silent><nowait><expr> <C-f> coc#float#has_scroll() ? "\<c-r>=coc#float#scroll(1)\<cr>" : "\<Right>"
-  inoremap <silent><nowait><expr> <C-b> coc#float#has_scroll() ? "\<c-r>=coc#float#scroll(0)\<cr>" : "\<Left>"
-  vnoremap <silent><nowait><expr> <C-f> coc#float#has_scroll() ? coc#float#scroll(1) : "\<C-f>"
-  vnoremap <silent><nowait><expr> <C-b> coc#float#has_scroll() ? coc#float#scroll(0) : "\<C-b>"
+    nnoremap <silent><nowait><expr> <C-f> coc#float#has_scroll() ? coc#float#scroll(1) : "\<C-f>"
+    nnoremap <silent><nowait><expr> <C-b> coc#float#has_scroll() ? coc#float#scroll(0) : "\<C-b>"
+    inoremap <silent><nowait><expr> <C-f> coc#float#has_scroll() ? "\<c-r>=coc#float#scroll(1)\<cr>" : "\<Right>"
+    inoremap <silent><nowait><expr> <C-b> coc#float#has_scroll() ? "\<c-r>=coc#float#scroll(0)\<cr>" : "\<Left>"
+    vnoremap <silent><nowait><expr> <C-f> coc#float#has_scroll() ? coc#float#scroll(1) : "\<C-f>"
+    vnoremap <silent><nowait><expr> <C-b> coc#float#has_scroll() ? coc#float#scroll(0) : "\<C-b>"
 endif
 
 " Add `:Format` command to format current buffer.
@@ -359,16 +361,16 @@ nnoremap <silent><nowait> <space>k  :<C-u>CocPrev<CR>
 nnoremap <silent><nowait> <space>p  :<C-u>CocListResume<CR>
 
 let g:coc_global_extensions = [
-    \'coc-markdownlint',
-    \'coc-highlight',
-    \'coc-go',
-    \'coc-pyright',
-    \'coc-json', 
-    \'coc-git',
-    \'coc-yaml',
-    \'coc-tsserver',
-    \'coc-marketplace'
-\]
+            \'coc-markdownlint',
+            \'coc-highlight',
+            \'coc-go',
+            \'coc-pyright',
+            \'coc-json',
+            \'coc-git',
+            \'coc-yaml',
+            \'coc-tsserver',
+            \'coc-marketplace'
+            \]
 
 " vim-terraform setting
 let g:terraform_align=1
@@ -381,11 +383,11 @@ nmap f <Plug>(easymotion-overwin-f)
 " s{char}{char} to move to {char}{char}
 nmap s <Plug>(easymotion-overwin-f2)
 
-" vim-ansible set up                               
-let g:ansible_unindent_after_newline = 1           
-let g:ansible_attribute_highlight = "ob"           
-let g:ansible_name_highlight = 'd'                 
-let g:ansible_extra_keywords_highlight = 1         
+" vim-ansible set up
+let g:ansible_unindent_after_newline = 1
+let g:ansible_attribute_highlight = "ob"
+let g:ansible_name_highlight = 'd'
+let g:ansible_extra_keywords_highlight = 1
 let g:ansible_normal_keywords_highlight = 'Constant'
 let g:ansible_with_keywords_highlight = 'Constant'
 let g:ansible_template_syntaxes = { '*.rb.j2': 'ruby' }
