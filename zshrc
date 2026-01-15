@@ -36,8 +36,11 @@ antigen apply
 # `Frozing' tty, so after any command terminal settings will be restored
 ttyctl -f
 
-# Custom common alias
-alias la="lsd -al"
+# Custom eza alias (modern ls replacement)
+alias ls="eza"
+alias ll="eza -l --icons"
+alias la="eza -la --icons"
+alias lt="eza --tree --icons"
 
 # Custom brew alias
 alias bi="brew install"
@@ -67,7 +70,7 @@ alias ga="git add --all"
 alias gp="git push"
 alias gct="git checkout"
 alias gm="git merge"
-alias gh="open `git remote -v | grep fetch | awk '{print $2}' | sed 's/git@/http:\/\//' | sed 's/com:/com\//'`| head -n1"
+alias gh="open $(git remote -v | grep fetch | awk '{print $2}' | sed 's/git@/http:\/\//' | sed 's/com:/com\//'| head -n1)"
 
 # Custom tmux alias
 alias tx="tmux -2 -u"
@@ -167,13 +170,6 @@ export ICLOUD=~/Library/Mobile\ Documents/com~apple~CloudDocs
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 source ~/.p10k.zsh
 
-# fuck
-eval $(thefuck --alias)
-
-# stern completion
-alias s="stern -A"
-source <(stern --completion=zsh)
-
 # krew environment
 export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
 
@@ -191,11 +187,6 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
-
-# Add GOPATH env
-export GOPATH=$HOME/go
-export GOBIN=$HOME/go/bin
-export PATH=$PATH:/usr/local/go/bin:$(go env GOBIN)
 
 # python3
 alias python="python3"
@@ -217,3 +208,4 @@ export PATH=$PATH:$ANDROID_HOME/tools
 export PATH=$PATH:$ANDROID_HOME/tools/bin
 export PATH=$PATH:$ANDROID_HOME/platform-tools
 export UV_USE_IO_URING=0
+export PATH="$HOME/.local/bin:$PATH"
