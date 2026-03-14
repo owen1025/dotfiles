@@ -1,0 +1,6 @@
+# Machine-specific local configs (contain secrets)
+zshrc.local
+*.local
+
+# macOS
+.DS_Store

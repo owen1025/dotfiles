@@ -42,6 +42,9 @@ alias ll="eza -l --icons"
 alias la="eza -la --icons"
 alias lt="eza --tree --icons"
 
+# Custom bat alias (modern cat replacement)
+alias cat="bat"
+
 # Custom brew alias
 alias bi="brew install"
 alias bri="brew reinstall"
@@ -70,7 +73,7 @@ alias ga="git add --all"
 alias gp="git push"
 alias gct="git checkout"
 alias gm="git merge"
-alias gh="open $(git remote -v | grep fetch | awk '{print $2}' | sed 's/git@/http:\/\//' | sed 's/com:/com\//'| head -n1)"
+alias gopen="open $(git remote -v | grep fetch | awk '{print $2}' | sed 's/git@/http:\/\//' | sed 's/com:/com\//'| head -n1)"
 
 # Custom tmux alias
 alias tx="tmux -2 -u"
@@ -106,6 +109,9 @@ alias tgi="terragrunt init"
 alias tga="terragrunt apply"
 alias tgp="terragrunt plan"
 alias tgd="terragrunt destroy"
+
+# GCP Terraform SA credentials
+# export GOOGLE_APPLICATION_CREDENTIALS="$HOME/Desktop/gowid/gowid-devops/devops-terraform/config/gowid-prd-terraform-admin.json"
 
 # Custom ansible alias
 alias ap="ansible-playbook"
@@ -202,6 +208,9 @@ alias k="kubecolor"
 # complete -o default -F __start_kubectl kubecolor
 compdef kubecolor=kubectl
 
+# claude
+alias ch="claude -p" # headless
+
 export ANDROID_HOME=$HOME/Library/Android/sdk
 export PATH=$PATH:$ANDROID_HOME/emulator
 export PATH=$PATH:$ANDROID_HOME/tools
@@ -209,3 +218,24 @@ export PATH=$PATH:$ANDROID_HOME/tools/bin
 export PATH=$PATH:$ANDROID_HOME/platform-tools
 export UV_USE_IO_URING=0
 export PATH="$HOME/.local/bin:$PATH"
+
+# opencode
+export PATH=/Users/gowid/.opencode/bin:$PATH
+
+# Load local machine-specific config (not committed to git)
+[[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
+
+# Tailscale with custom socket (userspace mode)
+alias tailscale="tailscale --socket=/Users/gowid/.local/share/tailscale/tailscaled.sock"
+
+# Claude Code OTEL Telemetry (devops-bot usage tracking)
+export CLAUDE_CODE_ENABLE_TELEMETRY=1
+export OTEL_METRICS_ENABLED=true
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+export OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
+export OTEL_METRICS_INCLUDE_SESSION_ID=false
+export OTEL_RESOURCE_ATTRIBUTES="team=devops,user=jepil.choi@gowid.com"
+
+# OpenClaw Completion
+source "/Users/gowid/.openclaw/completions/openclaw.zsh"

@@ -53,6 +53,9 @@ Plug 'antoinemadec/coc-fzf'
 Plug 'brooth/far.vim'
 Plug 'madox2/vim-ai'
 
+" Markdown preview
+Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && npx --yes yarn install' }
+
 " Initialize plugin system
 call plug#end()
 " ####################### vim-plug stop #######################
@@ -80,7 +83,6 @@ set softtabstop=4
 set expandtab
 set fencs=ucs-bom,utf-8,euc-kr.latin1 " 한글 파일은 euc-kr로, 유니코드는 유니코드로
 set fileencoding=utf-8 " 파일저장인코딩
-set tenc=utf-8
 set incsearch        " 키워드 입력시 점진적 검색
 set history=1000
 set t_Co=256
@@ -96,6 +98,9 @@ set nosmartindent
 au BufWrite * :Autoformat
 
 autocmd FileType yaml setlocal ts=2 sts=2 sw=2 expandtab
+autocmd FileType yaml let b:autoformat_autoindent=0
+autocmd FileType yaml let b:autoformat_retab=0
+autocmd FileType yaml let b:autoformat_remove_trailing_spaces=0
 autocmd FileType yml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType toml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType hcl setlocal ts=2 sts=2 sw=2 expandtab
@@ -446,3 +451,36 @@ nnoremap T $
 imap <silent> <C-u> <Plug>(copilot-next)
 imap <silent> <C-i> <Plug>(copilot-previous)
 imap <silent> <C-o> <Plug>(copilot-dismiss)
+
+" ####################### Markdown settings #######################
+" markdown-preview.nvim (https://github.com/iamcco/markdown-preview.nvim)
+let g:mkdp_auto_start = 0          " 자동 시작 안함
+let g:mkdp_auto_close = 1          " 버퍼 나가면 프리뷰 자동 종료
+let g:mkdp_refresh_slow = 0        " 실시간 새로고침
+let g:mkdp_browser = ''            " 기본 브라우저 사용
+let g:mkdp_preview_options = {
+    \ 'mkit': {},
+    \ 'katex': {},
+    \ 'uml': {},
+    \ 'maid': {},
+    \ 'disable_sync_scroll': 0,
+    \ 'sync_scroll_type': 'middle',
+    \ 'hide_yaml_meta': 1,
+    \ 'sequence_diagrams': {},
+    \ 'flowchart_diagrams': {},
+    \ 'content_editable': v:false,
+    \ 'disable_filename': 0,
+    \ 'toc': {}
+    \ }
+
+" Markdown preview keymaps
+nmap <Leader>mp <Plug>MarkdownPreview
+nmap <Leader>ms <Plug>MarkdownPreviewStop
+nmap <Leader>mt <Plug>MarkdownPreviewToggle
+
+" Markdown file settings
+autocmd FileType markdown setlocal wrap
+autocmd FileType markdown setlocal linebreak
+autocmd FileType markdown setlocal spell spelllang=en_us
+autocmd FileType markdown setlocal conceallevel=2
+autocmd FileType markdown setlocal ts=2 sts=2 sw=2 expandtab
