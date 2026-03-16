@@ -1,6 +1,7 @@
 {
   "plugin": [
     "oh-my-opencode",
+    "opencode-ntfy",
     "opencode-antigravity-auth@1.6.0",
     "@plannotator/opencode@latest"
   ],
@@ -46,17 +47,6 @@
         "CLIENT_ID": "${GDRIVE_CLIENT_ID}",
         "CLIENT_SECRET": "${GDRIVE_CLIENT_SECRET}",
         "GDRIVE_CREDS_DIR": "${HOME}/.config/gdrive-mcp"
-      },
-      "enabled": true
-    },
-    "notify": {
-      "type": "local",
-      "command": [
-        "node",
-        "${HOME}/.config/opencode/mcp-servers/notify-server.js"
-      ],
-      "environment": {
-        "NTFY_TOPIC": "gowid-opencode-notify"
       },
       "enabled": true
     },

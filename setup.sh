@@ -52,9 +52,8 @@ ln -sf "${BASEDIR}/opencode/themes/owen.json" "${OPENCODE_CONFIG_DIR}/themes/owe
 ln -sf "${BASEDIR}/opencode/command/plannotator-annotate.md" "${OPENCODE_CONFIG_DIR}/command/plannotator-annotate.md"
 ln -sf "${BASEDIR}/opencode/command/plannotator-review.md" "${OPENCODE_CONFIG_DIR}/command/plannotator-review.md"
 
-# Custom MCP servers
-ln -sf "${BASEDIR}/opencode/mcp-servers/notify-server.js" "${OPENCODE_CONFIG_DIR}/mcp-servers/notify-server.js"
-ln -sf "${BASEDIR}/opencode/mcp-servers/package.json" "${OPENCODE_CONFIG_DIR}/mcp-servers/package.json"
+# Plugin config
+ln -sf "${BASEDIR}/opencode/opencode-ntfy.json" "${OPENCODE_CONFIG_DIR}/opencode-ntfy.json"
 
 # Plugins
 ln -sf "${BASEDIR}/opencode/plugins/superpowers.js" "${OPENCODE_CONFIG_DIR}/plugins/superpowers.js"
@@ -63,6 +62,14 @@ ln -sf "${BASEDIR}/opencode/plugins/superpowers.js" "${OPENCODE_CONFIG_DIR}/plug
 (cd "${OPENCODE_CONFIG_DIR}/mcp-servers" && npm install 2>/dev/null)
 
 echo "✓ OpenCode config linked"
+
+# ──────────────────────────────────────────────
+# Ghostty terminal config
+# ──────────────────────────────────────────────
+GHOSTTY_CONFIG_DIR="${HOME}/Library/Application Support/com.mitchellh.ghostty"
+mkdir -p "${GHOSTTY_CONFIG_DIR}"
+ln -sf "${BASEDIR}/ghostty/config" "${GHOSTTY_CONFIG_DIR}/config"
+echo "✓ Ghostty config linked"
 
 # Apply the zsh config(Powerlevel9K, Plugin, etc...)
 source ~/.zshrc
