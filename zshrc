@@ -191,11 +191,6 @@ export TMUXINATOR_CONFIG="$HOME/.tmuxinator"
 # Set iCloud path
 export ICLOUD=~/Library/Mobile\ Documents/com~apple~CloudDocs
 
-# zoxide (replaces fasd + autojump)
-eval "$(zoxide init zsh)"
-alias cd="z"
-alias cdi="zi"
-
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 source ~/.p10k.zsh
 
@@ -222,6 +217,11 @@ alias python="python3"
 alias pip="pip3"
 
 autoload -U compinit && compinit -u
+
+# zoxide (replaces fasd + autojump) — must be after compinit
+eval "$(zoxide init zsh)"
+alias cd="z"
+alias cdi="zi"
 
 # kubectx/kubens alias completions (fzf-tab compatible)
 _comp_kx() {
