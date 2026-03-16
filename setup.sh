@@ -71,6 +71,14 @@ mkdir -p "${GHOSTTY_CONFIG_DIR}"
 ln -sf "${BASEDIR}/ghostty/config" "${GHOSTTY_CONFIG_DIR}/config"
 echo "✓ Ghostty config linked"
 
+# ──────────────────────────────────────────────
+# npm global packages
+# ──────────────────────────────────────────────
+if command -v npm &>/dev/null; then
+	xargs npm install -g <"${BASEDIR}/npm-global-packages.txt"
+	echo "✓ npm global packages installed"
+fi
+
 # Apply the zsh config(Powerlevel9K, Plugin, etc...)
 source ~/.zshrc
 
