@@ -4,3 +4,12 @@ zshrc.local
 
 # macOS
 .DS_Store
+
+# OpenCode - runtime/sensitive files
+opencode/node_modules/
+opencode/bun.lock
+opencode/mcp-servers/node_modules/
+opencode/mcp-servers/package-lock.json
+opencode/antigravity-accounts.json
+opencode/antigravity-signature-cache.json
+opencode/antigravity-logs/

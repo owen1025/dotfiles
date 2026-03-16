@@ -1,0 +1,50 @@
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  "google_auth": false,
+  "experimental": {
+    "dynamic_context_pruning": {
+      "enabled": true,
+      "notification": "minimal",
+      "turn_protection": {
+        "enabled": true,
+        "turns": 3
+      },
+      "strategies": {
+        "deduplication": {
+          "enabled": true
+        },
+        "supersede_writes": {
+          "enabled": true,
+          "aggressive": false
+        },
+        "purge_errors": {
+          "enabled": true,
+          "turns": 5
+        }
+      }
+    }
+  },
+  "agents": {
+    "librarian": {
+      "model": "google/antigravity-gemini-3-flash"
+    },
+    "explore": {
+      "model": "google/antigravity-gemini-3-flash"
+    },
+    "oracle": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "frontend-ui-ux-engineer": {
+      "model": "google/antigravity-gemini-3-pro-high"
+    },
+    "document-writer": {
+      "model": "google/antigravity-gemini-3-flash"
+    },
+    "multimodal-looker": {
+      "model": "anthropic/claude-sonnet-4-6"
+    }
+  },
+  "_migrations": [
+    "model-version:anthropic/claude-sonnet-4-5->anthropic/claude-sonnet-4-6"
+  ]
+}

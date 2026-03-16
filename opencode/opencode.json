@@ -1,0 +1,126 @@
+{
+  "plugin": [
+    "oh-my-opencode",
+    "opencode-antigravity-auth@1.6.0",
+    "@plannotator/opencode@latest"
+  ],
+  "mcp": {
+    "kubernetes": {
+      "type": "local",
+      "command": ["npx", "-y", "mcp-server-kubernetes"],
+      "enabled": true
+    },
+    "mermaid": {
+      "type": "local",
+      "command": ["npx", "-y", "@narasimhaponnada/mermaid-mcp-server"],
+      "enabled": true
+    },
+    "slack": {
+      "type": "local",
+      "command": ["npx", "-y", "slack-mcp-server", "--transport", "stdio"],
+      "environment": {
+        "SLACK_MCP_XOXC_TOKEN": "${SLACK_MCP_XOXC_TOKEN}",
+        "SLACK_MCP_XOXD_TOKEN": "${SLACK_MCP_XOXD_TOKEN}"
+      },
+      "enabled": true
+    },
+    "memory": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-memory"],
+      "enabled": true
+    },
+    "linear": {
+      "type": "local",
+      "command": ["npx", "-y", "@tacticlaunch/mcp-linear"],
+      "enabled": true
+    },
+    "notion": {
+      "type": "local",
+      "command": ["npx", "-y", "@notionhq/notion-mcp-server@1.9.1"],
+      "enabled": true
+    },
+    "gdrive": {
+      "type": "local",
+      "command": ["npx", "-y", "@isaacphi/mcp-gdrive"],
+      "environment": {
+        "CLIENT_ID": "${GDRIVE_CLIENT_ID}",
+        "CLIENT_SECRET": "${GDRIVE_CLIENT_SECRET}",
+        "GDRIVE_CREDS_DIR": "${HOME}/.config/gdrive-mcp"
+      },
+      "enabled": true
+    },
+    "notify": {
+      "type": "local",
+      "command": [
+        "node",
+        "${HOME}/.config/opencode/mcp-servers/notify-server.js"
+      ],
+      "environment": {
+        "NTFY_TOPIC": "gowid-opencode-notify"
+      },
+      "enabled": true
+    },
+    "github": {
+      "type": "local",
+      "command": ["npx", "-y", "@ldraney/github-mcp"],
+      "environment": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      },
+      "enabled": true
+    },
+    "terraform": {
+      "type": "local",
+      "command": ["npx", "-y", "terraform-mcp-server"],
+      "enabled": true
+    },
+    "gcp": {
+      "type": "local",
+      "command": ["npx", "-y", "mcp-server-gcp"],
+      "enabled": true
+    }
+  },
+  "provider": {
+    "google": {
+      "name": "Google",
+      "models": {
+        "antigravity-gemini-3-pro-high": {
+          "name": "Gemini 3 Pro High (Antigravity)",
+          "attachment": true,
+          "limit": {
+            "context": 1048576,
+            "output": 65535
+          },
+          "modalities": {
+            "input": ["text", "image", "pdf"],
+            "output": ["text"]
+          }
+        },
+        "antigravity-gemini-3-pro-low": {
+          "name": "Gemini 3 Pro Low (Antigravity)",
+          "attachment": true,
+          "limit": {
+            "context": 1048576,
+            "output": 65535
+          },
+          "modalities": {
+            "input": ["text", "image", "pdf"],
+            "output": ["text"]
+          }
+        },
+        "antigravity-gemini-3-flash": {
+          "name": "Gemini 3 Flash (Antigravity)",
+          "attachment": true,
+          "limit": {
+            "context": 1048576,
+            "output": 65536
+          },
+          "modalities": {
+            "input": ["text", "image", "pdf"],
+            "output": ["text"]
+          }
+        }
+      }
+    }
+  },
+  "$schema": "https://opencode.ai/config.json"
+}

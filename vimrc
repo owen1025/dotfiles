@@ -22,6 +22,7 @@ Plugin 'hashivim/vim-terraform'
 Plugin 'easymotion/vim-easymotion'
 Plugin 'tpope/vim-surround'
 Plugin 'vim-autoformat/vim-autoformat'
+Plugin 'tpope/vim-repeat'
 
 call vundle#end()            " required
 filetype plugin indent on" required
@@ -52,6 +53,10 @@ Plug 'sheerun/vim-polyglot'
 Plug 'antoinemadec/coc-fzf'
 Plug 'brooth/far.vim'
 Plug 'madox2/vim-ai'
+Plug 'christoomey/vim-tmux-navigator'
+Plug 'mbbill/undotree'
+Plug 'preservim/tagbar'
+Plug 'folke/which-key.nvim'
 
 " Markdown preview
 Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && npx --yes yarn install' }
@@ -78,6 +83,7 @@ set autoread
 au CursorHold * checktime
 set splitright
 set autoindent
+set tabstop=4
 set shiftwidth=4
 set softtabstop=4
 set expandtab
@@ -101,6 +107,11 @@ autocmd FileType yaml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType yaml let b:autoformat_autoindent=0
 autocmd FileType yaml let b:autoformat_retab=0
 autocmd FileType yaml let b:autoformat_remove_trailing_spaces=0
+autocmd FileType markdown let b:autoformat_autoindent=0
+autocmd FileType markdown let b:autoformat_retab=0
+autocmd FileType markdown let b:autoformat_remove_trailing_spaces=0
+autocmd FileType text let b:autoformat_autoindent=0
+autocmd FileType text let b:autoformat_retab=0
 autocmd FileType yml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType toml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType hcl setlocal ts=2 sts=2 sw=2 expandtab
@@ -446,6 +457,30 @@ au FileType far_vim map <buffer><silent>q :bw<cr>
 
 " normal mode에서 G를 눌렀을 때 커서를 텍스트 끝으로 이동하는 vimrc 설정 추가
 nnoremap T $
+
+" vim-tmux-navigator
+let g:tmux_navigator_no_mappings = 1
+nnoremap <silent> <M-h> :TmuxNavigateLeft<cr>
+nnoremap <silent> <M-j> :TmuxNavigateDown<cr>
+nnoremap <silent> <M-k> :TmuxNavigateUp<cr>
+nnoremap <silent> <M-l> :TmuxNavigateRight<cr>
+
+" undotree
+nnoremap <Leader>u :UndotreeToggle<CR>
+
+" tagbar
+nmap <Leader>t :TagbarToggle<CR>
+let g:tagbar_width = 30
+let g:tagbar_autofocus = 1
+
+" which-key.nvim
+if has('nvim')
+    lua << EOF
+    vim.o.timeout = true
+    vim.o.timeoutlen = 500
+    require("which-key").setup({})
+EOF
+endif
 
 " copilot
 imap <silent> <C-u> <Plug>(copilot-next)

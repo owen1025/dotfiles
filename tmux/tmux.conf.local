@@ -42,7 +42,7 @@ tmux_conf_new_session_prompt=false
 # RGB 24-bit colour support (tmux >= 2.2), possible values are:
 #  - true
 #  - false (default)
-tmux_conf_theme_24b_colour=false
+tmux_conf_theme_24b_colour=true
 
 # window style
 tmux_conf_theme_window_fg='default'
@@ -276,8 +276,33 @@ tmux_conf_copy_to_os_clipboard=false
 run-shell ~/clone/path/resurrect.tmux
 
 # -- user customizations -------------------------------------------------------
-set -g default-terminal "xterm-256color" # colors!
 # this is the place to override or undo settings
+
+# --- Terminal & color configuration (Ghostty-compatible) ----------------------
+# Use tmux-256color (avoids stale iTerm2 terminfo from TERMINFO_DIRS)
+set -g default-terminal "tmux-256color"
+set -as terminal-features ",tmux-256color:RGB"
+set -as terminal-overrides ",*:Tc"
+
+# Allow OSC passthrough so apps can query terminal background color (OSC 11)
+# This is critical for TUI apps (opencode, etc.) to detect Ghostty's theme
+set -g allow-passthrough on
+
+# Clean stale env vars from previous terminal (iTerm2 remnants in tmux server)
+set-environment -g -u ITERM_PROFILE
+set-environment -g -u ITERM_SESSION_ID
+set-environment -g -u TERM_SESSION_ID
+set-environment -g -u LC_TERMINAL
+set-environment -g -u LC_TERMINAL_VERSION
+set-environment -g -u TERM_PROGRAM
+set-environment -g -u TERM_PROGRAM_VERSION
+set-environment -g -u TERM_FEATURES
+set-environment -g -u TERMINFO_DIRS
+set-environment -g -u COLORFGBG
+set-environment -g -u __CFBundleIdentifier
+
+# Set correct color environment for Ghostty
+set-environment -g COLORTERM truecolor
 
 # increase history size
 #set -g history-limit 10000
@@ -345,3 +370,19 @@ bind Up select-pane -U
 bind Right select-pane -R
 
 unbind C-d
+
+# Layout selector popup menu (replaces prefix+Space cycling)
+bind Space display-menu -T "Select Layout" \
+  "━  Even Horizontal"  1 "select-layout even-horizontal" \
+  "║  Even Vertical"    2 "select-layout even-vertical" \
+  "━┃ Main Horizontal"  3 "select-layout main-horizontal" \
+  "┃━ Main Vertical"    4 "select-layout main-vertical" \
+  "田 Tiled"            5 "select-layout tiled"
+
+# vim-tmux-navigator integration (Alt+hjkl for seamless pane navigation)
+is_vim="ps -o state= -o comm= -t '#{pane_tty}' \
+    | grep -iqE '^[^TXZ ]+ +(\\S+\\/)?g?(view|l?n?vim?x?|fzf)(diff)?$'"
+bind-key -n M-h if-shell "$is_vim" 'send-keys M-h'  'select-pane -L'
+bind-key -n M-j if-shell "$is_vim" 'send-keys M-j'  'select-pane -D'
+bind-key -n M-k if-shell "$is_vim" 'send-keys M-k'  'select-pane -U'
+bind-key -n M-l if-shell "$is_vim" 'send-keys M-l'  'select-pane -R'

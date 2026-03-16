@@ -1,0 +1,8 @@
+{
+  "name": "opencode-mcp-servers",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.1"
+  }
+}

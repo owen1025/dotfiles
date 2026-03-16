@@ -1,15 +1,16 @@
-export TERM="xterm-256color"
+# Set TERM only outside tmux — inside tmux, let tmux's default-terminal take effect
+if [[ -z "$TMUX" ]]; then
+  export TERM="xterm-256color"
+fi
 
 # Path to your oh-my-zsh installation.
 export ZSH="${HOME}/.oh-my-zsh"
 
 plugins=(
-    fasd
     aws
     kubectl
     sudo
     asdf
-    autojump
 )
 
 source $ZSH/oh-my-zsh.sh
@@ -27,6 +28,10 @@ antigen bundle command-not-found
 antigen bundle zsh-users/zsh-syntax-highlighting
 antigen bundle zsh-users/zsh-autosuggestions
 antigen bundle zsh-users/zsh-completions
+antigen bundle zsh-users/zsh-history-substring-search
+antigen bundle Aloxaf/fzf-tab
+antigen bundle djui/alias-tips
+
 # Load the theme.
 antigen theme romkatv/powerlevel10k
 
@@ -35,6 +40,10 @@ antigen apply
 
 # `Frozing' tty, so after any command terminal settings will be restored
 ttyctl -f
+
+# history-substring-search key bindings
+bindkey '^[[A' history-substring-search-up
+bindkey '^[[B' history-substring-search-down
 
 # Custom eza alias (modern ls replacement)
 alias ls="eza"
@@ -128,8 +137,8 @@ alias kgp="kubectl get pods -o wide"
 alias kge="kubectl get events --sort-by=.metadata.creationTimestamp"
 alias kgn="kubectl get nodes -L beta.kubernetes.io/instance-type -L node.carpenstreet.com/type -L beta.kubernetes.io/arch -L node.carpenstreet.com/hardware"
 
-alias kx="kubectx"
-alias ke="kubens"
+function kx() { kubectx "$@" }
+function ke() { kubens "$@" }
 
 alias krb="kubectl run -i --rm --tty busybox --image=busybox -- sh"
 alias krc="kubectl run -i --rm --tty busybox --image=centos:latest -- bash"
@@ -149,8 +158,14 @@ alias kdn="kubectl drain node --ignore-daemonsets --delete-emptydir-data"
 alias h="helm"
 alias hla="helm list -A"
 
-# Custom lazygit aliazs
+# Custom lazygit alias
 alias lg="lazygit"
+
+# Custom lazydocker alias
+alias ld="lazydocker"
+
+# Custom tldr alias (tealdeer)
+alias tl="tldr"
 
 # get my external ip
 alias gei="curl -s http://whatismijnip.nl |cut -d \" \" -f 5"
@@ -166,12 +181,20 @@ export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 source <(fzf --zsh)
 
+# forgit (installed via brew)
+source /opt/homebrew/opt/forgit/share/forgit/forgit.plugin.zsh
+
 # Custom ENV
 export EDITOR="nvim"
 export TMUXINATOR_CONFIG="$HOME/.tmuxinator"
 
 # Set iCloud path
 export ICLOUD=~/Library/Mobile\ Documents/com~apple~CloudDocs
+
+# zoxide (replaces fasd + autojump)
+eval "$(zoxide init zsh)"
+alias cd="z"
+alias cdi="zi"
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 source ~/.p10k.zsh
@@ -199,6 +222,20 @@ alias python="python3"
 alias pip="pip3"
 
 autoload -U compinit && compinit -u
+
+# kubectx/kubens alias completions (fzf-tab compatible)
+_comp_kx() {
+    local -a contexts
+    contexts=(${(f)"$(kubectl config get-contexts --output='name' 2>/dev/null)"})
+    _describe 'kube contexts' contexts
+}
+_comp_ke() {
+    local -a namespaces
+    namespaces=(${(f)"$(kubectl get namespaces -o jsonpath='{.items[*].metadata.name}' 2>/dev/null)"})
+    _describe 'kube namespaces' namespaces
+}
+compdef _comp_kx kx
+compdef _comp_ke ke
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 # kubecolor

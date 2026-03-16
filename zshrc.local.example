@@ -1,0 +1,13 @@
+# Machine-specific environment variables
+# Copy this file to ~/.zshrc.local and customize
+
+# === Work Machine Credentials ===
+# Notion API
+# export NOTION_API_KEY="secret_xxxxx"
+
+# Linear API
+# export LINEAR_API_TOKEN="lin_api_xxxxx"
+
+# Slack Bot
+# export SLACK_BOT_TOKEN="xoxb-xxxxx"
+# export SLACK_TEAM_ID="T12345678"
