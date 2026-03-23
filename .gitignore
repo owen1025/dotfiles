@@ -13,3 +13,6 @@ opencode/mcp-servers/package-lock.json
 opencode/antigravity-accounts.json
 opencode/antigravity-signature-cache.json
 opencode/antigravity-logs/
+
+# OMC runtime state
+.omc/

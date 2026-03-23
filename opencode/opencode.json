@@ -3,22 +3,37 @@
     "oh-my-opencode",
     "opencode-ntfy",
     "opencode-antigravity-auth@1.6.0",
-    "@plannotator/opencode@latest"
+    "@plannotator/opencode@latest",
+    "opencode-anthropic-oauth@latest"
   ],
   "mcp": {
     "kubernetes": {
       "type": "local",
-      "command": ["npx", "-y", "mcp-server-kubernetes"],
+      "command": [
+        "npx",
+        "-y",
+        "mcp-server-kubernetes"
+      ],
       "enabled": true
     },
     "mermaid": {
       "type": "local",
-      "command": ["npx", "-y", "@narasimhaponnada/mermaid-mcp-server"],
+      "command": [
+        "npx",
+        "-y",
+        "@narasimhaponnada/mermaid-mcp-server"
+      ],
       "enabled": true
     },
     "slack": {
       "type": "local",
-      "command": ["npx", "-y", "slack-mcp-server", "--transport", "stdio"],
+      "command": [
+        "npx",
+        "-y",
+        "slack-mcp-server",
+        "--transport",
+        "stdio"
+      ],
       "environment": {
         "SLACK_MCP_XOXC_TOKEN": "${SLACK_MCP_XOXC_TOKEN}",
         "SLACK_MCP_XOXD_TOKEN": "${SLACK_MCP_XOXD_TOKEN}"
@@ -27,22 +42,38 @@
     },
     "memory": {
       "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-memory"],
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
       "enabled": true
     },
     "linear": {
       "type": "local",
-      "command": ["npx", "-y", "@tacticlaunch/mcp-linear"],
+      "command": [
+        "npx",
+        "-y",
+        "@tacticlaunch/mcp-linear"
+      ],
       "enabled": true
     },
     "notion": {
       "type": "local",
-      "command": ["npx", "-y", "@notionhq/notion-mcp-server@1.9.1"],
+      "command": [
+        "npx",
+        "-y",
+        "@notionhq/notion-mcp-server@1.9.1"
+      ],
       "enabled": true
     },
     "gdrive": {
       "type": "local",
-      "command": ["npx", "-y", "@isaacphi/mcp-gdrive"],
+      "command": [
+        "npx",
+        "-y",
+        "@isaacphi/mcp-gdrive"
+      ],
       "environment": {
         "CLIENT_ID": "${GDRIVE_CLIENT_ID}",
         "CLIENT_SECRET": "${GDRIVE_CLIENT_SECRET}",
@@ -52,7 +83,11 @@
     },
     "github": {
       "type": "local",
-      "command": ["npx", "-y", "@ldraney/github-mcp"],
+      "command": [
+        "npx",
+        "-y",
+        "@ldraney/github-mcp"
+      ],
       "environment": {
         "GITHUB_TOKEN": "${GITHUB_TOKEN}"
       },
@@ -60,12 +95,20 @@
     },
     "terraform": {
       "type": "local",
-      "command": ["npx", "-y", "terraform-mcp-server"],
+      "command": [
+        "npx",
+        "-y",
+        "terraform-mcp-server"
+      ],
       "enabled": true
     },
     "gcp": {
       "type": "local",
-      "command": ["npx", "-y", "mcp-server-gcp"],
+      "command": [
+        "npx",
+        "-y",
+        "mcp-server-gcp"
+      ],
       "enabled": true
     }
   },
@@ -81,8 +124,14 @@
             "output": 65535
           },
           "modalities": {
-            "input": ["text", "image", "pdf"],
-            "output": ["text"]
+            "input": [
+              "text",
+              "image",
+              "pdf"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "antigravity-gemini-3-pro-low": {
@@ -93,8 +142,14 @@
             "output": 65535
           },
           "modalities": {
-            "input": ["text", "image", "pdf"],
-            "output": ["text"]
+            "input": [
+              "text",
+              "image",
+              "pdf"
+            ],
+            "output": [
+              "text"
+            ]
           }
         },
         "antigravity-gemini-3-flash": {
@@ -105,8 +160,14 @@
             "output": 65536
           },
           "modalities": {
-            "input": ["text", "image", "pdf"],
-            "output": ["text"]
+            "input": [
+              "text",
+              "image",
+              "pdf"
+            ],
+            "output": [
+              "text"
+            ]
           }
         }
       }

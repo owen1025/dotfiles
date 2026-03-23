@@ -64,6 +64,17 @@ ln -sf "${BASEDIR}/opencode/plugins/superpowers.js" "${OPENCODE_CONFIG_DIR}/plug
 echo "✓ OpenCode config linked"
 
 # ──────────────────────────────────────────────
+# Claude Code config (MCP servers, settings)
+# ──────────────────────────────────────────────
+CLAUDE_CONFIG_DIR="${HOME}/.claude"
+mkdir -p "${CLAUDE_CONFIG_DIR}"
+
+ln -sf "${BASEDIR}/claude/.mcp.json" "${CLAUDE_CONFIG_DIR}/.mcp.json"
+ln -sf "${BASEDIR}/claude/settings.json" "${CLAUDE_CONFIG_DIR}/settings.json"
+
+echo "✓ Claude Code config linked"
+
+# ──────────────────────────────────────────────
 # Ghostty terminal config
 # ──────────────────────────────────────────────
 GHOSTTY_CONFIG_DIR="${HOME}/Library/Application Support/com.mitchellh.ghostty"
