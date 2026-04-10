@@ -1,31 +1,8 @@
-{{- $opAvailable := false -}}
-{{- if lookPath "op" -}}
-{{-   $opAvailable = true -}}
-{{- end -}}
 # Machine-specific environment variables
-# Managed by chezmoi + 1Password
+# Copy this file to ~/.zshrc.local and fill in your values:
+#   cp ~/.zshrc.local.example ~/.zshrc.local
 
-# === Work Machine Credentials ===
-{{ if $opAvailable -}}
-# Notion API
-export NOTION_API_KEY="{{ onepasswordRead "op://Personal/dotfiles-secrets/NOTION_API_KEY" }}"
-export NOTION_TOKEN="{{ onepasswordRead "op://Personal/dotfiles-secrets/NOTION_TOKEN" }}"
-
-# Linear API
-export LINEAR_API_TOKEN="{{ onepasswordRead "op://Personal/dotfiles-secrets/LINEAR_API_TOKEN" }}"
-
-# Slack Bot (argocd)
-export SLACK_BOT_TOKEN="{{ onepasswordRead "op://Personal/dotfiles-secrets/SLACK_BOT_TOKEN" }}"
-export SLACK_TEAM_ID="{{ onepasswordRead "op://Personal/dotfiles-secrets/SLACK_TEAM_ID" }}"
-
-# Slack MCP (Personal - korotovsky/slack-mcp-server)
-export SLACK_MCP_XOXC_TOKEN="{{ onepasswordRead "op://Personal/dotfiles-secrets/SLACK_MCP_XOXC_TOKEN" }}"
-export SLACK_MCP_XOXD_TOKEN="{{ onepasswordRead "op://Personal/dotfiles-secrets/SLACK_MCP_XOXD_TOKEN" }}"
-
-# ntfy.sh topic for notifications
-export NTFY_TOPIC="{{ onepasswordRead "op://Personal/dotfiles-secrets/NTFY_TOPIC" }}"
-{{ else -}}
-# 1Password CLI (op) not installed — run 'brew install 1password-cli' then 'chezmoi apply'
+# === Credentials ===
 export NOTION_API_KEY=""
 export NOTION_TOKEN=""
 export LINEAR_API_TOKEN=""
@@ -34,7 +11,6 @@ export SLACK_TEAM_ID=""
 export SLACK_MCP_XOXC_TOKEN=""
 export SLACK_MCP_XOXD_TOKEN=""
 export NTFY_TOPIC=""
-{{ end -}}
 
 # === OpenCode/Claude Code Utilities ===
 
