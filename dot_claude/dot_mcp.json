@@ -1,0 +1,56 @@
+{
+  "mcpServers": {
+    "kubernetes": {
+      "command": "npx",
+      "args": ["-y", "mcp-server-kubernetes"]
+    },
+    "mermaid": {
+      "command": "npx",
+      "args": ["-y", "@narasimhaponnada/mermaid-mcp-server"]
+    },
+    "slack": {
+      "command": "npx",
+      "args": ["-y", "slack-mcp-server", "--transport", "stdio"],
+      "env": {
+        "SLACK_MCP_XOXC_TOKEN": "${SLACK_MCP_XOXC_TOKEN}",
+        "SLACK_MCP_XOXD_TOKEN": "${SLACK_MCP_XOXD_TOKEN}"
+      }
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"]
+    },
+    "linear": {
+      "command": "npx",
+      "args": ["-y", "@tacticlaunch/mcp-linear"]
+    },
+    "notion": {
+      "command": "npx",
+      "args": ["-y", "@notionhq/notion-mcp-server@1.9.1"]
+    },
+    "gdrive": {
+      "command": "npx",
+      "args": ["-y", "@isaacphi/mcp-gdrive"],
+      "env": {
+        "CLIENT_ID": "${GDRIVE_CLIENT_ID}",
+        "CLIENT_SECRET": "${GDRIVE_CLIENT_SECRET}",
+        "GDRIVE_CREDS_DIR": "${HOME}/.config/gdrive-mcp"
+      }
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@ldraney/github-mcp"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "terraform": {
+      "command": "npx",
+      "args": ["-y", "terraform-mcp-server"]
+    },
+    "gcp": {
+      "command": "npx",
+      "args": ["-y", "mcp-server-gcp"]
+    }
+  }
+}
