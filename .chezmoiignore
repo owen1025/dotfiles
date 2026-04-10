@@ -1,0 +1,8 @@
+README.md
+LICENSE
+.omc/
+Brewfile.lock.json
+*.bak*
+*.backup*
+node_modules/
+sessions/
