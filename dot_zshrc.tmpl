@@ -275,4 +275,4 @@ export OTEL_METRICS_INCLUDE_SESSION_ID=false
 export OTEL_RESOURCE_ATTRIBUTES="team=devops,user={{ .email }}"
 
 # OpenClaw Completion
-source "{{ .chezmoi.homeDir }}/.openclaw/completions/openclaw.zsh"
+[ -f "{{ .chezmoi.homeDir }}/.openclaw/completions/openclaw.zsh" ] && source "{{ .chezmoi.homeDir }}/.openclaw/completions/openclaw.zsh"
