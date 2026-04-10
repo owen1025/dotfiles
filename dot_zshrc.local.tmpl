@@ -1,0 +1,81 @@
+# Machine-specific environment variables (Work Machine)
+# This file is NOT committed to git
+
+# === Work Machine Credentials ===
+# Notion API
+export NOTION_API_KEY="{{ onepasswordRead "op://Personal/dotfiles-secrets/NOTION_API_KEY" }}"
+export NOTION_TOKEN="{{ onepasswordRead "op://Personal/dotfiles-secrets/NOTION_TOKEN" }}"
+
+# Linear API
+export LINEAR_API_TOKEN="{{ onepasswordRead "op://Personal/dotfiles-secrets/LINEAR_API_TOKEN" }}"
+
+# Slack Bot (argocd)
+export SLACK_BOT_TOKEN="{{ onepasswordRead "op://Personal/dotfiles-secrets/SLACK_BOT_TOKEN" }}"
+export SLACK_TEAM_ID="{{ onepasswordRead "op://Personal/dotfiles-secrets/SLACK_TEAM_ID" }}"
+
+# Slack MCP (Personal - korotovsky/slack-mcp-server)
+export SLACK_MCP_XOXC_TOKEN="{{ onepasswordRead "op://Personal/dotfiles-secrets/SLACK_MCP_XOXC_TOKEN" }}"
+export SLACK_MCP_XOXD_TOKEN="{{ onepasswordRead "op://Personal/dotfiles-secrets/SLACK_MCP_XOXD_TOKEN" }}"
+
+# === OpenCode/Claude Code Utilities ===
+
+# ntfy.sh topic for notifications (change this to your own topic)
+export NTFY_TOPIC="{{ onepasswordRead "op://Personal/dotfiles-secrets/NTFY_TOPIC" }}"
+
+# Send notification via ntfy.sh
+ntfy() {
+  local message="${1:-Task completed}"
+  local title="${2:-OpenCode}"
+  curl -s -H "Title: $title" -d "$message" "ntfy.sh/${NTFY_TOPIC}" > /dev/null 2>&1
+}
+
+# Run opencode with notification on completion
+opencode-notify() {
+  local start_time=$(date +%s)
+  local project_name=$(basename "$(pwd)")
+  
+  opencode "$@"
+  local exit_code=$?
+  
+  local end_time=$(date +%s)
+  local duration=$((end_time - start_time))
+  local duration_fmt=$(printf '%02d:%02d:%02d' $((duration/3600)) $((duration%3600/60)) $((duration%60)))
+  
+  if [ $exit_code -eq 0 ]; then
+    ntfy "✅ $project_name 완료 ($duration_fmt)" "OpenCode"
+  else
+    ntfy "❌ $project_name 오류 (exit: $exit_code, $duration_fmt)" "OpenCode Error"
+  fi
+  
+  # macOS native notification as backup
+  osascript -e "display notification \"$project_name 작업 완료\" with title \"OpenCode\" sound name \"Glass\"" 2>/dev/null
+  
+  return $exit_code
+}
+
+# Alias for convenience
+alias oc='opencode-notify'      # 알림 포함 (기본)
+alias ocq='opencode'            # 알림 없이 빠르게 실행
+alias ocn='opencode-notify'     # 명시적 알림 버전
+
+# recall configuration
+export RECALL_OPENCODE_CMD="opencode --resume {id}"
+
+# Screenshot helper - save to fixed location for easy reference
+export SCREENSHOT_DIR="$HOME/Desktop/screenshots"
+mkdir -p "$SCREENSHOT_DIR" 2>/dev/null
+
+# Get latest screenshot
+latest-ss() {
+  ls -t "$SCREENSHOT_DIR"/*.png 2>/dev/null | head -1
+}
+
+# Quick screenshot analysis prompt
+ss-analyze() {
+  local latest=$(latest-ss)
+  if [ -n "$latest" ]; then
+    echo "Analyze this screenshot: $latest"
+  else
+    echo "No screenshots found in $SCREENSHOT_DIR"
+  fi
+}
