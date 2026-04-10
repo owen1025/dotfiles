@@ -1,4 +1,4 @@
-# Machine-specific environment variables
+# Machine-specific environment variables (secrets only)
 # Copy this file to ~/.zshrc.local and fill in your values:
 #   cp ~/.zshrc.local.example ~/.zshrc.local
 
@@ -11,55 +11,3 @@ export SLACK_TEAM_ID=""
 export SLACK_MCP_XOXC_TOKEN=""
 export SLACK_MCP_XOXD_TOKEN=""
 export NTFY_TOPIC=""
-
-# === OpenCode/Claude Code Utilities ===
-
-ntfy() {
-  local message="${1:-Task completed}"
-  local title="${2:-OpenCode}"
-  curl -s -H "Title: $title" -d "$message" "ntfy.sh/${NTFY_TOPIC}" > /dev/null 2>&1
-}
-
-opencode-notify() {
-  local start_time=$(date +%s)
-  local project_name=$(basename "$(pwd)")
-
-  opencode "$@"
-  local exit_code=$?
-
-  local end_time=$(date +%s)
-  local duration=$((end_time - start_time))
-  local duration_fmt=$(printf '%02d:%02d:%02d' $((duration/3600)) $((duration%3600/60)) $((duration%60)))
-
-  if [ $exit_code -eq 0 ]; then
-    ntfy "✅ $project_name 완료 ($duration_fmt)" "OpenCode"
-  else
-    ntfy "❌ $project_name 오류 (exit: $exit_code, $duration_fmt)" "OpenCode Error"
-  fi
-
-  osascript -e "display notification \"$project_name 작업 완료\" with title \"OpenCode\" sound name \"Glass\"" 2>/dev/null
-
-  return $exit_code
-}
-
-alias oc='opencode-notify'
-alias ocq='opencode'
-alias ocn='opencode-notify'
-
-export RECALL_OPENCODE_CMD="opencode --resume {id}"
-
-export SCREENSHOT_DIR="$HOME/Desktop/screenshots"
-mkdir -p "$SCREENSHOT_DIR" 2>/dev/null
-
-latest-ss() {
-  ls -t "$SCREENSHOT_DIR"/*.png 2>/dev/null | head -1
-}
-
-ss-analyze() {
-  local latest=$(latest-ss)
-  if [ -n "$latest" ]; then
-    echo "Analyze this screenshot: $latest"
-  else
-    echo "No screenshots found in $SCREENSHOT_DIR"
-  fi
-}
