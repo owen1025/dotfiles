@@ -1,0 +1,59 @@
+# Ghostty config — migrated from iTerm2 "Owen" profile
+# =======================================================
+
+# Font
+font-family = Hack Nerd Font Mono
+font-size = 16
+font-style = Regular
+font-style-bold = Bold
+font-style-italic = Italic
+font-thicken = true
+
+# Korean fallback (Hangul Jamo + Compatibility Jamo + Syllables + Compatibility)
+font-codepoint-map = U+1100-11FF=D2CodingLigatureNerdFontMono-Regular
+font-codepoint-map = U+3130-318F=D2CodingLigatureNerdFontMono-Regular
+font-codepoint-map = U+AC00-D7AF=D2CodingLigatureNerdFontMono-Regular
+font-codepoint-map = U+FFA0-FFDC=D2CodingLigatureNerdFontMono-Regular
+
+# Colors — custom theme matching iTerm2 "Owen"
+background = #1c252a
+foreground = #e7eaed
+cursor-color = #e9e9e9
+cursor-text = #000000
+selection-background = #4e6978
+selection-foreground = #e7eaed
+bold-is-bright = false
+
+# Palette (Ansi 0–15)
+palette = 0=#435a66
+palette = 1=#fb3841
+palette = 2=#5cf09e
+palette = 3=#fed032
+palette = 4=#36b6fe
+palette = 5=#fb216e
+palette = 6=#58ffd1
+palette = 7=#fffefe
+palette = 8=#a0b0b8
+palette = 9=#fc736d
+palette = 10=#acf6be
+palette = 11=#fee16c
+palette = 12=#6fcefe
+palette = 13=#fc669a
+palette = 14=#99ffe5
+palette = 15=#fffefe
+
+# Cursor
+cursor-style = block
+cursor-style-blink = false
+
+# Window
+window-padding-x = 2
+window-padding-y = 2
+
+# Scrollback
+scrollback-limit = 1000
+
+# macOS specific
+macos-option-as-alt = false
+window-decoration = true
+macos-titlebar-style = transparent
