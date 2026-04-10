@@ -79,12 +79,31 @@ chezmoi apply  # run_onchange_01이 brew bundle 자동 실행
 chezmoi apply  # run_onchange_02가 npm install 자동 실행
 ```
 
-### 변경사항 다른 머신에 반영
+### 변경사항 다른 머신에 반영 (push 측)
 ```bash
 chezmoi cd && git add -A && git commit -m "msg" && git push && exit
-# 다른 머신에서:
-chezmoi update
 ```
+
+### 원격 머신에서 변경사항 동기화 (pull 측)
+
+원격 머신에서 에이전트가 dotfiles 업데이트를 요청받으면:
+
+```bash
+# 1. 원격 변경사항 가져오기 + 적용 (git pull + chezmoi apply 한 번에)
+chezmoi update
+
+# 2. 적용 결과 확인
+chezmoi status  # 비어있으면 정상
+```
+
+**에이전트 프롬프트 예시:**
+> "dotfiles 최신으로 동기화해줘" 또는 "chezmoi update 실행해줘"
+
+**주의:**
+- `chezmoi update`는 `git pull` + `chezmoi apply`를 한 번에 수행
+- `run_onchange_` 스크립트가 트리거될 수 있음 (brew bundle, npm install 등)
+- config만 동기화하려면: `chezmoi update --exclude=scripts`
+- 충돌 시: `chezmoi diff`로 확인 후 수동 해결
 
 ### 드리프트 확인
 ```bash
