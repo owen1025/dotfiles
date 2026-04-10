@@ -1,0 +1,4 @@
+#!/bin/bash
+# npm-global-packages hash: {{ include "npm-global-packages.txt" | sha256sum }}
+set -e
+grep -v '^#' "{{ .chezmoi.sourceDir }}/npm-global-packages.txt" | grep -v '^$' | xargs npm install -g

@@ -1,0 +1,13 @@
+# npm global packages
+# Install: xargs npm install -g < npm-global-packages.txt
+# Dump:    npm list -g --depth=0 --parseable | tail -n +2 | xargs -I {} basename {}
+@mermaid-js/mermaid-cli
+@plannotator/opencode
+carbonyl
+clawdbot
+oh-my-claude-sisyphus
+openclaw
+opencode
+typescript-language-server
+typescript
+vercel

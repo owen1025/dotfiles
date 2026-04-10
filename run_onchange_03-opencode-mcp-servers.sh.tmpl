@@ -1,0 +1,4 @@
+#!/bin/bash
+# package.json hash: {{ include "dot_config/opencode/mcp-servers/package.json" | sha256sum }}
+set -e
+cd "$HOME/.config/opencode/mcp-servers" && npm install
