@@ -92,6 +92,67 @@ chezmoi status   # 변경된 파일 목록
 chezmoi diff     # 구체적 차이
 ```
 
+## Agent Workflow (필수)
+
+이 프로젝트는 chezmoi source directory이자 git repo다.
+설정을 수정/추가/삭제할 때 반드시 아래 순서를 따라야 한다.
+
+### 변경 후 반영 흐름 (MANDATORY)
+
+```
+1. chezmoi source 파일 수정 (이 프로젝트의 파일 직접 편집)
+2. git add + commit + push
+3. chezmoi apply (로컬 홈 디렉토리에 반영)
+```
+
+### 구체적 예시
+
+**설정 파일 수정 시:**
+```bash
+# 1. source 파일 편집 (예: dot_zshrc.tmpl)
+# 2. git 반영
+git add -A && git commit -m "update zshrc" && git push
+# 3. 로컬에 적용
+chezmoi apply --exclude=scripts
+```
+
+**새 설정 파일 추가 시:**
+```bash
+# 방법 A: 라이브 파일에서 가져오기
+chezmoi add --follow ~/.config/새파일
+git add -A && git commit -m "add 새파일" && git push
+
+# 방법 B: source에 직접 생성
+# dot_config/새파일 생성 후:
+git add -A && git commit -m "add 새파일" && git push
+chezmoi apply --exclude=scripts
+```
+
+**설정 파일 삭제 시:**
+```bash
+# 1. source에서 삭제
+rm dot_config/삭제할파일
+# 2. git 반영
+git add -A && git commit -m "remove 삭제할파일" && git push
+# 3. 홈 디렉토리에서도 수동 삭제 (chezmoi는 managed 파일을 자동 삭제하지 않음)
+rm ~/.config/삭제할파일
+```
+
+**Brewfile/npm-global-packages.txt 수정 시:**
+```bash
+# 1. 파일 편집
+# 2. git 반영
+git add -A && git commit -m "add package X" && git push
+# 3. 적용 (스크립트 포함 — brew bundle / npm install 자동 실행)
+chezmoi apply
+```
+
+### 주의사항
+- `chezmoi apply` 없이 git push만 하면 **로컬에 반영 안 됨**
+- `chezmoi apply --exclude=scripts` → config 파일만 적용 (brew bundle 등 skip)
+- `chezmoi apply` → 전체 적용 (스크립트 포함, brew bundle이 오래 걸릴 수 있음)
+- 다른 머신에서 가져오기: `chezmoi update` (= git pull + apply)
+
 ## Gotchas
 
 - **Ghostty 경로에 공백** — `Library/Application Support/` chezmoi가 네이티브 처리하므로 따옴표 불필요
