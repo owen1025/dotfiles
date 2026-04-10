@@ -7,7 +7,6 @@ carbonyl
 clawdbot
 oh-my-claude-sisyphus
 openclaw
-opencode
 typescript-language-server
 typescript
 vercel
