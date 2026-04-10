@@ -1,4 +1,5 @@
 #!/bin/bash
 # npm-global-packages hash: {{ include "npm-global-packages.txt" | sha256sum }}
 set -e
+eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null)" || true
 grep -v '^#' "{{ .chezmoi.sourceDir }}/npm-global-packages.txt" | grep -v '^$' | xargs npm install -g
