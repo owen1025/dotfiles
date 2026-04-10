@@ -10,10 +10,10 @@ font-style-italic = Italic
 font-thicken = true
 
 # Korean fallback (Hangul Jamo + Compatibility Jamo + Syllables + Compatibility)
-font-codepoint-map = U+1100-11FF=D2CodingLigatureNerdFontMono-Regular
-font-codepoint-map = U+3130-318F=D2CodingLigatureNerdFontMono-Regular
-font-codepoint-map = U+AC00-D7AF=D2CodingLigatureNerdFontMono-Regular
-font-codepoint-map = U+FFA0-FFDC=D2CodingLigatureNerdFontMono-Regular
+font-codepoint-map = U+1100-11FF=D2CodingLigature Nerd Font Mono
+font-codepoint-map = U+3130-318F=D2CodingLigature Nerd Font Mono
+font-codepoint-map = U+AC00-D7AF=D2CodingLigature Nerd Font Mono
+font-codepoint-map = U+FFA0-FFDC=D2CodingLigature Nerd Font Mono
 
 # Colors — custom theme matching iTerm2 "Owen"
 background = #1c252a
