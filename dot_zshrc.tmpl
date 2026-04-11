@@ -269,10 +269,12 @@ export PATH={{ .chezmoi.homeDir }}/.opencode/bin:$PATH
 # Load local machine-specific config (not committed to git)
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
+# Tailscale
+alias ts="tailscale"
+
 # Tailscale with custom socket (userspace mode on macOS)
 if [[ -S "{{ .chezmoi.homeDir }}/.local/share/tailscale/tailscaled.sock" ]]; then
   alias tailscale="tailscale --socket={{ .chezmoi.homeDir }}/.local/share/tailscale/tailscaled.sock"
-  alias ts="tailscale"
 fi
 
 # Claude Code OTEL Telemetry (devops-bot usage tracking)
