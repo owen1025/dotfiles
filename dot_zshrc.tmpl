@@ -269,6 +269,7 @@ export PATH={{ .chezmoi.homeDir }}/.opencode/bin:$PATH
 # Tailscale with custom socket (userspace mode on macOS)
 if [[ -S "{{ .chezmoi.homeDir }}/.local/share/tailscale/tailscaled.sock" ]]; then
   alias tailscale="tailscale --socket={{ .chezmoi.homeDir }}/.local/share/tailscale/tailscaled.sock"
+  alias ts="tailscale"
 fi
 
 # Claude Code OTEL Telemetry (devops-bot usage tracking)
