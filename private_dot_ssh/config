@@ -1,10 +1,10 @@
 Host *
-	IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+    IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
 
-Host gowid-mp2
-	HostName gowidui-macbookpro-1
-	User gowid
+Host gowid-office
+    HostName 100.86.162.98
+    User gowid
 
-Host gowid-mp1
-	HostName 100.127.204.100
-	User gowid
+Host gowid-mp
+    HostName 100.127.204.100
+    User gowid
