@@ -223,6 +223,9 @@ eval "$(zoxide init zsh)"
 alias cd="z"
 alias cdi="zi"
 
+# atuin (magical shell history — replaces Ctrl+R)
+eval "$(atuin init zsh)"
+
 # kubectx/kubens alias completions (fzf-tab compatible)
 _comp_kx() {
     local -a contexts
