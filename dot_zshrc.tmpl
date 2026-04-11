@@ -255,6 +255,9 @@ alias czd="chezmoi diff --exclude=scripts"
 # claude
 alias ch="claude -p" # headless
 
+# github
+alias grl="gh repo list --limit 100 --json nameWithOwner -q '.[].nameWithOwner' | fzf | xargs gh repo clone"
+
 export ANDROID_HOME=$HOME/Library/Android/sdk
 export PATH=$PATH:$ANDROID_HOME/emulator
 export PATH=$PATH:$ANDROID_HOME/tools
