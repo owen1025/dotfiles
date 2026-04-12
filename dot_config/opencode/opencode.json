@@ -1,6 +1,6 @@
 {
   "plugin": [
-    "opencode-ntfy",
+    "opencode-ntfy.sh@latest",
     "opencode-claude-auth@latest",
     "oh-my-openagent@latest",
     "opencode-antigravity-auth@latest"

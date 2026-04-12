@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "events": {
+    "session.idle": { "enabled": true },
+    "session.error": { "enabled": true },
+    "permission.asked": { "enabled": true }
+  },
+  "backend": {
+    "topic": "gowid-opencode-notify",
+    "server": "https://ntfy.sh",
+    "priority": "default"
+  }
+}
