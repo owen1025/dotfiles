@@ -1,6 +1,8 @@
 {{- $email := promptStringOnce . "email" "Git email address" -}}
 {{- $name := promptStringOnce . "name" "Git full name" -}}
+{{- $useAnthropicAuth := promptBoolOnce . "useAnthropicAuth" "Use @ex-machina/opencode-anthropic-auth plugin" -}}
 
 [data]
     email = {{ $email | quote }}
     name = {{ $name | quote }}
+    useAnthropicAuth = {{ $useAnthropicAuth }}
