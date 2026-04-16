@@ -6,8 +6,12 @@
 export NOTION_API_KEY=""
 export NOTION_TOKEN=""
 export LINEAR_API_TOKEN=""
-export SLACK_BOT_TOKEN=""
-export SLACK_TEAM_ID=""
 export SLACK_MCP_XOXC_TOKEN=""
 export SLACK_MCP_XOXD_TOKEN=""
 export NTFY_TOPIC=""
+
+# === Slack Bot Factory (auto-managed by slack-bot-factory skill) ===
+# Format: SLACK_{WORKSPACE}_{BOT}_{APP_TOKEN|BOT_TOKEN}
+# Example:
+#   export SLACK_NOANSWER_SECRETARY_APP_TOKEN="xapp-..."
+#   export SLACK_NOANSWER_SECRETARY_BOT_TOKEN="xoxb-..."
