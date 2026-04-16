@@ -1,5 +1,5 @@
 #!/bin/bash
-# Brewfile hash: {{ include "Brewfile" | sha256sum }}
+# Brewfile hash: {{ include "Brewfile.tmpl" | sha256sum }}
 set -e
-eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null)" || true
-brew bundle --file="{{ .chezmoi.sourceDir }}/Brewfile"
+eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /home/linuxbrew/.linuxbrew/bin/brew shellenv 2>/dev/null)" || true
+brew bundle --file="{{ .chezmoi.homeDir }}/Brewfile"

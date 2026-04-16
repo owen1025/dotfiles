@@ -1,5 +1,5 @@
 #!/bin/bash
 # package.json hash: {{ include "dot_config/opencode/mcp-servers/package.json" | sha256sum }}
 set -e
-eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null)" || true
+eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /home/linuxbrew/.linuxbrew/bin/brew shellenv 2>/dev/null)" || true
 cd "$HOME/.config/opencode/mcp-servers" && npm install
