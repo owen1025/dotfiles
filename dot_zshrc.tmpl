@@ -3,6 +3,16 @@ if [[ -z "$TMUX" ]]; then
   export TERM="xterm-256color"
 fi
 
+# Cache brew prefix to avoid repeated $(brew --prefix) calls during shell startup
+# Order: Apple Silicon (/opt/homebrew) → Linuxbrew (/home/linuxbrew/.linuxbrew) → fallback empty
+if [[ -x "/opt/homebrew/bin/brew" ]]; then
+  _BREW_PREFIX="/opt/homebrew"
+elif [[ -x "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
+  _BREW_PREFIX="/home/linuxbrew/.linuxbrew"
+else
+  _BREW_PREFIX=""
+fi
+
 # Path to your oh-my-zsh installation.
 export ZSH="${HOME}/.oh-my-zsh"
 
@@ -182,14 +192,17 @@ export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 source <(fzf --zsh)
 
 # forgit (installed via brew)
-source /opt/homebrew/opt/forgit/share/forgit/forgit.plugin.zsh
+_FORGIT_PATH="${_BREW_PREFIX}/opt/forgit/share/forgit/forgit.plugin.zsh"
+[ -f "$_FORGIT_PATH" ] && source "$_FORGIT_PATH"
 
 # Custom ENV
 export EDITOR="nvim"
 export TMUXINATOR_CONFIG="$HOME/.tmuxinator"
 
-# Set iCloud path
+{{ if eq .chezmoi.os "darwin" -}}
+# Set iCloud path (macOS only)
 export ICLOUD=~/Library/Mobile\ Documents/com~apple~CloudDocs
+{{- end }}
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 source ~/.p10k.zsh
@@ -205,7 +218,7 @@ alias k9s="export XDG_CONFIG_HOME=~ && k9s"
 alias awsp="source _awsp"
 
 # ctags
-alias ctags="`brew --prefix`/bin/ctags"
+alias ctags="${_BREW_PREFIX}/bin/ctags"
 
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
@@ -258,11 +271,13 @@ alias ch="claude -p" # headless
 # github
 alias grl="gh repo list --limit 100 --json nameWithOwner -q '.[].nameWithOwner' | fzf | xargs gh repo clone"
 
+{{ if eq .chezmoi.os "darwin" -}}
 export ANDROID_HOME=$HOME/Library/Android/sdk
 export PATH=$PATH:$ANDROID_HOME/emulator
 export PATH=$PATH:$ANDROID_HOME/tools
 export PATH=$PATH:$ANDROID_HOME/tools/bin
 export PATH=$PATH:$ANDROID_HOME/platform-tools
+{{- end }}
 export UV_USE_IO_URING=0
 export PATH="$HOME/.local/bin:$PATH"
 
@@ -319,7 +334,9 @@ opencode-notify() {
     ntfy "❌ $project_name 오류 (exit: $exit_code, $duration_fmt)" "OpenCode Error"
   fi
 
+{{ if eq .chezmoi.os "darwin" -}}
   osascript -e "display notification \"$project_name 작업 완료\" with title \"OpenCode\" sound name \"Glass\"" 2>/dev/null
+{{- end }}
 
   return $exit_code
 }
