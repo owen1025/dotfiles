@@ -1,0 +1,31 @@
+{
+  "display_information": {
+    "name": "{{DISPLAY_NAME}}",
+    "description": "OpenCode {{DISPLAY_NAME}} agent bridge"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "{{DISPLAY_NAME}}",
+      "always_online": false
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "app_mentions:read",
+        "chat:write",
+        "channels:history",
+        "channels:read"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "bot_events": ["app_mention", "message.channels"]
+    },
+    "interactivity": {"is_enabled": false},
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": true,
+    "token_rotation_enabled": true
+  }
+}
