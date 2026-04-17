@@ -14,10 +14,12 @@ Linux)
 		echo "$BREW_ZSH" | sudo tee -a /etc/shells >/dev/null
 	fi
 
-	# chsh if current shell is not BREW_ZSH
+	# Change shell if not already BREW_ZSH
+	# Try chsh first (works with password auth), fall back to sudo usermod
+	# (usermod works in passwordless-sudo / automation environments)
 	current_shell="$(getent passwd "$USER" | cut -d: -f7)"
 	if [ "$current_shell" != "$BREW_ZSH" ]; then
-		chsh -s "$BREW_ZSH"
+		chsh -s "$BREW_ZSH" 2>/dev/null || sudo usermod -s "$BREW_ZSH" "$USER"
 	fi
 	;;
 Darwin)
