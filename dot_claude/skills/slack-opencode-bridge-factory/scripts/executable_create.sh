@@ -355,7 +355,11 @@ cmd_create() {
 	local DISPLAY_NAME
 	DISPLAY_NAME="$(echo "${AGENT_NAME:0:1}" | tr '[:lower:]' '[:upper:]')${AGENT_NAME:1}"
 
-	factory_create_bot "$WORKSPACE" "$AGENT_NAME" "$DISPLAY_NAME" || die "Slack App creation failed"
+	if [[ "${SKIP_FACTORY:-false}" != "true" ]]; then
+		factory_create_bot "$WORKSPACE" "$AGENT_NAME" "$DISPLAY_NAME" || die "Slack App creation failed"
+	else
+		echo "SKIP_FACTORY: Skipping Slack App creation (test mode)"
+	fi
 	# On rollback: remove bot from factory state (Slack App preserved; user can delete manually)
 	rollback_register delete_registry "$AGENT_NAME"
 
