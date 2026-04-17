@@ -13,6 +13,7 @@ Commands:
   logs     <agent> [--tail N] [--follow] [--only opencode|bridge] Show agent logs
   update   <agent> [--model M] [--role-file P] [--rotate-tokens]  Update agent config
   delete   <agent> [--force] [--purge-project] [--purge-logs]     Remove agent
+  migrate  <agent> [--dry-run]                                    Migrate legacy agent to V1/V2
 
 Options:
   --help, -h   Show this help message
@@ -54,6 +55,10 @@ update)
 delete)
 	shift
 	exec bash "$SKILL_DIR/scripts/delete.sh" "${@}"
+	;;
+migrate)
+	shift
+	exec bash "$SKILL_DIR/scripts/migrate.sh" "${@}"
 	;;
 --help | -h | help) usage ;;
 "")
