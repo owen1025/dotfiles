@@ -68,6 +68,200 @@ find_template() {
 	echo "$found"
 }
 
+# --- Phase 2: Finalize ---
+
+cmd_finalize() {
+	# Parse: first arg is agent name, then --bot-token, --app-token
+	local AGENT_NAME=""
+	local BOT_TOKEN=""
+	local APP_TOKEN=""
+
+	# Handle both positional and flag forms
+	if [[ "${1:-}" != "--"* ]]; then
+		AGENT_NAME="$1"
+		shift
+	fi
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		--name)
+			AGENT_NAME="$2"
+			shift 2
+			;;
+		--bot-token)
+			BOT_TOKEN="$2"
+			shift 2
+			;;
+		--app-token)
+			APP_TOKEN="$2"
+			shift 2
+			;;
+		*)
+			echo "ERROR: Unknown option: $1" >&2
+			exit 1
+			;;
+		esac
+	done
+
+	[[ -z "$AGENT_NAME" ]] && die "Agent name required"
+	registry_exists "$AGENT_NAME" || die "Agent '$AGENT_NAME' not found in registry. Run create first."
+
+	# Interactive token input if not provided
+	if [[ -z "$BOT_TOKEN" ]]; then
+		printf "Bot Token (xoxb-...): "
+		read -r BOT_TOKEN
+	fi
+	if [[ -z "$APP_TOKEN" ]]; then
+		printf "App Token (xapp-...): "
+		read -r APP_TOKEN
+	fi
+	[[ -z "$BOT_TOKEN" ]] && die "Bot token required"
+	[[ -z "$APP_TOKEN" ]] && die "App token required"
+
+	# Load entry from registry
+	local entry
+	entry=$(registry_get "$AGENT_NAME")
+	local PORT
+	PORT=$(echo "$entry" | jq -r '.port')
+	local PROJECT_DIR
+	PROJECT_DIR=$(echo "$entry" | jq -r '.project_dir')
+	local WORKSPACE
+	WORKSPACE=$(echo "$entry" | jq -r '.slack.workspace_slug')
+	local BOT_TOKEN_ENV
+	BOT_TOKEN_ENV=$(echo "$entry" | jq -r '.slack.bot_token_env')
+	local APP_TOKEN_ENV
+	APP_TOKEN_ENV=$(echo "$entry" | jq -r '.slack.app_token_env')
+	local LOG_DIR
+	LOG_DIR=$(echo "$entry" | jq -r '.log_dir')
+	local OC_LABEL
+	OC_LABEL=$(echo "$entry" | jq -r '.daemon.opencode_label')
+	local BR_LABEL
+	BR_LABEL=$(echo "$entry" | jq -r '.daemon.bridge_label')
+	local WRAPPER_OC="$HOME/.local/bin/$AGENT_NAME-opencode-serve.sh"
+	local WRAPPER_BR="$HOME/.local/bin/$AGENT_NAME-bridge.sh"
+
+	# Rollback setup for Phase 2
+	rollback_register unload_daemon "$OC_LABEL" "$HOME/Library/LaunchAgents/$OC_LABEL.plist"
+	rollback_register unload_daemon "$BR_LABEL" "$HOME/Library/LaunchAgents/$BR_LABEL.plist"
+	rollback_register unset_env "$BOT_TOKEN_ENV"
+	rollback_register unset_env "$APP_TOKEN_ENV"
+	rollback_register delete_registry "$AGENT_NAME"
+
+	# 1. Finalize with factory (registers tokens)
+	factory_finalize_bot "$WORKSPACE" "$AGENT_NAME" "$APP_TOKEN" "$BOT_TOKEN" ""
+
+	# 2. Register tokens to ~/.zshrc.local
+	zshrc_local_set "$BOT_TOKEN_ENV" "$BOT_TOKEN"
+	zshrc_local_set "$APP_TOKEN_ENV" "$APP_TOKEN"
+
+	# 3. Get bot_user_id via Slack auth.test
+	local BOT_USER_ID
+	BOT_USER_ID=$(curl -s -H "Authorization: Bearer $BOT_TOKEN" \
+		"https://slack.com/api/auth.test" | jq -r '.user_id // empty')
+	[[ -z "$BOT_USER_ID" ]] && {
+		echo "WARN: Could not get bot_user_id from auth.test"
+		BOT_USER_ID="unknown"
+	}
+
+	# 4. Generate launchd plist files from templates
+	mkdir -p "$PROJECT_DIR/daemons"
+	mkdir -p "$LOG_DIR"
+	local OPENCODE_BIN
+	OPENCODE_BIN=$(detect_opencode_path)
+	local HOME_DIR="$HOME"
+
+	# Find template files (may have .literal suffix)
+	local TMPL_OC
+	TMPL_OC=$(find_template "launchd_opencode.plist.tmpl")
+	local TMPL_BR
+	TMPL_BR=$(find_template "launchd_bridge.plist.tmpl")
+
+	local PLIST_OC="$PROJECT_DIR/daemons/$OC_LABEL.plist"
+	local PLIST_BR="$PROJECT_DIR/daemons/$BR_LABEL.plist"
+
+	substitute_template "$TMPL_OC" "$PLIST_OC" \
+		"AGENT_NAME=$AGENT_NAME" \
+		"LAUNCHD_LABEL=$OC_LABEL" \
+		"WRAPPER_OPENCODE=$WRAPPER_OC" \
+		"HOME_DIR=$HOME_DIR" \
+		"LOG_DIR=$LOG_DIR" \
+		"PORT=$PORT"
+
+	substitute_template "$TMPL_BR" "$PLIST_BR" \
+		"AGENT_NAME=$AGENT_NAME" \
+		"LAUNCHD_LABEL=$BR_LABEL" \
+		"WRAPPER_BRIDGE=$WRAPPER_BR" \
+		"HOME_DIR=$HOME_DIR" \
+		"LOG_DIR=$LOG_DIR"
+
+	# 5. Install daemons
+	source "$SKILL_DIR/scripts/lib/daemon.sh"
+	local LINK_OC="$HOME/Library/LaunchAgents/$OC_LABEL.plist"
+	local LINK_BR="$HOME/Library/LaunchAgents/$BR_LABEL.plist"
+	install_daemon "$OC_LABEL" "$PLIST_OC" "$LINK_OC"
+	install_daemon "$BR_LABEL" "$PLIST_BR" "$LINK_BR"
+
+	# 6. Health checks
+	echo "Waiting for opencode serve to start..."
+	local health_ok=false
+	for i in $(seq 1 10); do
+		sleep 3
+		if curl -sf "http://localhost:$PORT/global/health" >/dev/null 2>&1; then
+			health_ok=true
+			break
+		fi
+		echo "  Attempt $i/10..."
+	done
+	if ! $health_ok; then
+		die "opencode serve health check failed after 30s on port $PORT"
+	fi
+	echo "opencode serve: OK"
+
+	echo "Waiting for bridge to connect..."
+	local bridge_ok=false
+	for i in $(seq 1 10); do
+		sleep 3
+		if grep -q "Bolt app is running" "$LOG_DIR/bridge.log" 2>/dev/null; then
+			bridge_ok=true
+			break
+		fi
+		echo "  Attempt $i/10..."
+	done
+	if ! $bridge_ok; then
+		die "Bridge failed to connect within 30s. Check: $LOG_DIR/bridge.log"
+	fi
+	echo "Bridge: OK"
+
+	# 7. Update registry with final data
+	local timestamp
+	timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+	local new_entry
+	new_entry=$(echo "$entry" | jq \
+		--arg status "running" \
+		--arg bot_user_id "$BOT_USER_ID" \
+		--arg ts "$timestamp" \
+		'.status = $status | .slack.bot_user_id = $bot_user_id | .updated_at = $ts')
+	registry_set "$AGENT_NAME" "$new_entry"
+
+	# 8. Save to Knowledge Graph (output JSON for caller to use)
+	local kg_json
+	local APP_ID
+	APP_ID=$(factory_get_bot_app_id "$WORKSPACE" "$AGENT_NAME" 2>/dev/null || echo "unknown")
+	kg_json=$(kg_bot_entity_json "$AGENT_NAME" "$WORKSPACE" "$APP_ID" "$BOT_USER_ID" "$BOT_TOKEN_ENV" "$APP_TOKEN_ENV")
+	echo ""
+	echo "=== Knowledge Graph Entity (paste this into MCP Memory if needed) ==="
+	echo "$kg_json" | jq .
+	echo "=================================================================="
+
+	rollback_commit
+
+	echo ""
+	echo "Agent '$AGENT_NAME' is ready!"
+	echo "  opencode: http://localhost:$PORT"
+	echo "  bridge log: $LOG_DIR/bridge.log"
+	echo "  Invite bot: /invite @$(echo "${AGENT_NAME:0:1}" | tr '[:lower:]' '[:upper:]')${AGENT_NAME:1}"
+}
+
 # --- Phase 1: Create ---
 
 cmd_create() {
@@ -326,4 +520,10 @@ cmd_create() {
 }
 
 # --- Main ---
-cmd_create "$@"
+case "${1:-}" in
+finalize)
+	shift
+	cmd_finalize "$@"
+	;;
+*) cmd_create "$@" ;;
+esac
