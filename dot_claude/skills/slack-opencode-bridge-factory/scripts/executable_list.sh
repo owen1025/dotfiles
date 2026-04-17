@@ -29,13 +29,10 @@ done
 registry_init
 
 # Get agent names
-mapfile -t NAMES < <(registry_list) || {
-	# Fallback for zsh/systems where mapfile doesn't work
-	NAMES=()
-	while IFS= read -r line; do
-		NAMES+=("$line")
-	done < <(registry_list)
-}
+NAMES=()
+while IFS= read -r line; do
+	[[ -n "$line" ]] && NAMES+=("$line")
+done < <(registry_list)
 
 if [[ -n "$FILTER_NAME" ]]; then
 	if ! registry_exists "$FILTER_NAME"; then
