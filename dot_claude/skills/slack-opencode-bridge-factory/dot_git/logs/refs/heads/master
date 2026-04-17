@@ -1,1 +1,0 @@
-0000000000000000000000000000000000000000 697da106c152bac42d7cdda67a526984129e9ae4 Owen <owen@example.com> 1776432853 +0900	commit (initial): fix(skill): fix rollback.sh awk reversal logic
