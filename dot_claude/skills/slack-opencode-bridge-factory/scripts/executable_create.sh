@@ -335,12 +335,6 @@ cmd_create() {
 		echo "Creating directory: $PROJECT_DIR"
 		mkdir -p "$PROJECT_DIR"
 	fi
-	if [[ -f "$PROJECT_DIR/opencode.json" ]]; then
-		echo "WARNING: $PROJECT_DIR/opencode.json already exists."
-		printf "Overwrite? (yes/no): "
-		read -r confirm
-		[[ "$confirm" != "yes" ]] && die "Aborted."
-	fi
 	if [[ -f "$PROJECT_DIR/AGENTS.md" ]]; then
 		ROLE_FILE="__KEEP_EXISTING__"
 	fi
@@ -376,12 +370,15 @@ cmd_create() {
 	fi
 	local model_to_use="${MODEL:-anthropic/claude-sonnet-4-5}"
 
-	# opencode.json
-	local tmpl_opencode
-	tmpl_opencode=$(find_template "opencode.json.tmpl")
-	substitute_template "$tmpl_opencode" "$PROJECT_DIR/opencode.json" \
-		"MODEL=$model_to_use"
-	rollback_register rm_file "$PROJECT_DIR/opencode.json"
+	# opencode.json (merge if exists, create if not)
+	source "$SKILL_DIR/scripts/lib/opencode_json.sh"
+	if [[ -f "$PROJECT_DIR/opencode.json" ]]; then
+		/bin/cp "$PROJECT_DIR/opencode.json" "$PROJECT_DIR/opencode.json.pre-bridge.bak"
+		rollback_register rm_file "$PROJECT_DIR/opencode.json.pre-bridge.bak"
+	else
+		rollback_register rm_file "$PROJECT_DIR/opencode.json"
+	fi
+	merge_opencode_config "$PROJECT_DIR/opencode.json" "$model_to_use" || die "opencode.json merge failed"
 
 	# AGENTS.md
 	if [[ "$ROLE_FILE" == "__KEEP_EXISTING__" ]]; then
