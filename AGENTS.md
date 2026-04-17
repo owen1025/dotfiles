@@ -12,7 +12,7 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply owen1025
 **Ubuntu (22.04 / 24.04 LTS):**
 ```bash
 # 1. Prerequisites 먼저 설치
-sudo apt-get update && sudo apt-get install -y curl git ca-certificates build-essential procps file zstd && sudo -v
+sudo apt-get update && sudo apt-get install -y curl git ca-certificates build-essential procps file zstd zsh && sudo -v
 # 2. 동일한 원라이너
 sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply owen1025
 ```
@@ -202,7 +202,7 @@ Ubuntu 22.04 / 24.04 LTS 기준:
 
 ```bash
 sudo apt-get update && \
-  sudo apt-get install -y curl git ca-certificates build-essential procps file zstd && \
+  sudo apt-get install -y curl git ca-certificates build-essential procps file zstd zsh && \
   sudo -v
 ```
 
