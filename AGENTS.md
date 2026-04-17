@@ -36,7 +36,7 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply owen1025
   │   └── k9s/                    ← k9s 쿠버네티스 UI (config, hotkey, skin, views)
   ├── private_Library/            ← Ghostty 터미널 설정
   ├── private_dot_ssh/                    ← SSH 설정 (config.tmpl — macOS 1Password IdentityAgent 분기)
-  ├── Brewfile                    ← Homebrew 패키지 목록 (138+)
+  ├── Brewfile.tmpl               ← Homebrew 패키지 목록 (템플릿 — cask는 darwin block에 격리)
   ├── npm-global-packages.txt     ← npm 글로벌 패키지 목록
   ├── run_before_*.sh             ← 부트스트랩 (brew, oh-my-zsh, antigen, fzf, vim plugins, tmux, zsh-kubecolor)
   ├── run_before_-1-install-prerequisites.sh ← Linux prereq 체크 (apt 패키지 존재 확인)
@@ -196,6 +196,20 @@ chezmoi apply
 
 ## Ubuntu (Headless Server) Bootstrap
 
+### Non-root user 필수
+
+**Linuxbrew는 root로 설치 불가** (`Don't run this as root!` 에러). 반드시 일반 사용자 계정에서 실행:
+
+```bash
+# root로 로그인되어 있다면 먼저 일반 사용자 생성:
+useradd -m -s /bin/bash -G sudo owen
+echo "owen ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/owen
+chmod 0440 /etc/sudoers.d/owen
+su - owen   # 전환 후 아래 과정 진행
+```
+
+비밀번호 없는 sudo가 권장됨 — `chsh` PAM 인증 실패 시 `sudo usermod` 폴백이 작동해야 함.
+
 ### Prerequisites (MANDATORY before one-liner)
 
 Ubuntu 22.04 / 24.04 LTS 기준:
@@ -207,6 +221,8 @@ sudo apt-get update && \
 ```
 
 `sudo -v` 는 sudo 세션을 유지하기 위함. chezmoi apply 중 `/etc/shells` 편집, docker/ngrok 설치 시 재프롬프트 방지.
+
+`zsh` 필수 — macOS는 `/bin/zsh` 내장이지만 Ubuntu는 별도 설치 필요 (oh-my-zsh 설치의 전제조건).
 
 ### One-liner
 
@@ -230,15 +246,26 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply owen1025
 - `sudo usermod -aG docker $USER` 후 재로그인 — docker 그룹 추가 (sudo 없이 docker 명령 사용)
 - `ngrok config add-authtoken <YOUR_TOKEN>` — ngrok authtoken 설정
 - 새 shell 세션 열기 — chsh로 zsh 전환 확인
+- (필요 시) `sudo passwd owen` — 원격 SSH 비밀번호 로그인용 비밀번호 설정
+
+### 비대화형 chezmoi init (CI/자동화)
+
+TTY가 없는 환경에서 `chezmoi init`은 prompt 입력을 받을 수 없으므로 플래그로 전달:
+
+```bash
+chezmoi init --apply --promptString email=you@example.com \
+  --promptString name="Your Name" --promptBool useAnthropicAuth=false owen1025
+```
 
 ### Known Limitations (Ubuntu 헤드리스 서버)
 
+- **Non-root user 필수** — Linuxbrew는 root 계정에서 설치 불가
 - macOS-only GUI 앱 (raycast, ghostty, stats, swiftbar 등) 설치 안 됨 (의도적)
 - EdgeMark, Ghostty 설정 (`private_Library/`, `private_Documents/EdgeMark/`) 배포 안 됨
 - 1Password SSH IdentityAgent 비활성화 (macOS 전용 socket)
 - Android SDK, iCloud 환경 변수 설정 안 됨
 - osascript 기반 macOS notification 비활성화 (ntfy.sh 알림은 여전히 작동)
-- Linuxbrew 첫 설치 시 20-30분 소요 (소스 컴파일)
+- **실제 부트스트랩 소요시간 ~25분** (brew bundle 설치가 대부분, 269개 formula + 의존성)
 
 ## Gotchas
 
@@ -252,3 +279,8 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply owen1025
 - **Linuxbrew PATH 우선순위** — Linuxbrew > /usr/bin. `git`, `zsh` 등은 brew 버전 사용됨
 - **systemd/cron에서 PATH** — non-interactive 컨텍스트에서는 `/home/linuxbrew/.linuxbrew/bin/<tool>` 직접 호출 권장
 - **Ubuntu 24.04 pip3** — PEP 668 적용. `pip3 install --break-system-packages` 또는 brew python3 pip3 사용
+- **`.chezmoiignore`는 target path 사용** — source의 `private_Library/` 가 아니라 deploy 경로인 `Library/**` 로 패턴 작성. chezmoi는 target filename 기준으로 매칭함
+- **Linux zshrc의 brew PATH** — macOS는 시스템이 자동으로 brew PATH 설정하지만 Linux는 zshrc 내에서 `eval "$($_BREW_PREFIX/bin/brew shellenv)"` 명시 필요 (chezmoi template `{{ if eq .chezmoi.os "linux" }}` 블록으로 처리)
+- **macOS-only brew formulas** — `telnet`, `chrome-cli`, `scrcpy`, `openfortivpn` 등은 Linuxbrew 미지원 → `Brewfile.tmpl`의 darwin block에 격리 필수. `brew install` 시 "macOS is required" 에러로 식별
+- **Linux `chsh` PAM 인증 실패** — 비밀번호 없는 sudo 환경에서 `chsh -s`는 PAM 에러 발생. `run_once_install-linux-zsh-default.sh`는 `sudo usermod -s` 폴백으로 처리
+- **forgit config 변수 export 필요** — forgit 최신 버전은 `_FORGIT_PATH` 등 설정 변수를 `export`로 요구 (미지원 시 deprecation warning)
