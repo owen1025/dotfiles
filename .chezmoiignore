@@ -10,8 +10,8 @@ node_modules/
 sessions/
 
 {{ if eq .chezmoi.os "linux" -}}
-private_Library/**
-private_Documents/EdgeMark/**
+Library/**
+Documents/EdgeMark/**
 {{- end }}
 
 
