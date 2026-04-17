@@ -269,7 +269,9 @@ tmux_conf_theme_clock_style='24'
 #   - false (default)
 # on macOS, this requires installing reattach-to-user-namespace, see README.md
 # on Linux, this requires xsel or xclip
-tmux_conf_copy_to_os_clipboard=false
+# NOTE: set to true so gpakosz framework wraps copy-selection with copy-pipe
+# that emits OSC 52, which Ghostty/terminal writes to OS clipboard via mosh
+tmux_conf_copy_to_os_clipboard=true
 
 # -- Plugins -------------------------------------------------------------------
 
@@ -287,6 +289,12 @@ set -as terminal-overrides ",*:Tc"
 # Allow OSC passthrough so apps can query terminal background color (OSC 11)
 # This is critical for TUI apps (opencode, etc.) to detect Ghostty's theme
 set -g allow-passthrough on
+
+# OSC 52 clipboard sync (tmux -> terminal -> OS clipboard)
+# Works over mosh too, with the Ms override below that mosh 1.4.0 requires
+# (mosh strictly parses OSC 52 and only accepts the 'c;' selection prefix)
+set -s set-clipboard on
+set -ag terminal-overrides ',tmux-256color:Ms=\E]52;c;%p2%s\7'
 
 # Clean stale env vars from previous terminal (iTerm2 remnants in tmux server)
 set-environment -g -u ITERM_PROFILE

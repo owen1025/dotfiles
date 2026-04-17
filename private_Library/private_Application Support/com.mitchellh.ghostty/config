@@ -57,3 +57,9 @@ scrollback-limit = 1000
 macos-option-as-alt = false
 window-decoration = true
 macos-titlebar-style = transparent
+
+# Clipboard — allow remote apps (tmux over mosh/ssh) to write to macOS pasteboard
+# via OSC 52 without confirmation prompt
+clipboard-write = allow
+clipboard-read = ask
+copy-on-select = clipboard
