@@ -341,6 +341,9 @@ cmd_create() {
 		read -r confirm
 		[[ "$confirm" != "yes" ]] && die "Aborted."
 	fi
+	if [[ -f "$PROJECT_DIR/AGENTS.md" ]]; then
+		ROLE_FILE="__KEEP_EXISTING__"
+	fi
 
 	# 6. Port allocation
 	if [[ -z "$PORT" ]]; then
@@ -364,6 +367,13 @@ cmd_create() {
 	rollback_register delete_registry "$AGENT_NAME"
 
 	# 8. Project scaffolding
+	if [[ -z "$MODEL" ]]; then
+		echo ""
+		echo "Which model should this agent use?"
+		echo "  Examples: anthropic/claude-sonnet-4-5, anthropic/claude-opus-4-5"
+		printf "Model [anthropic/claude-sonnet-4-5]: "
+		read -r MODEL
+	fi
 	local model_to_use="${MODEL:-anthropic/claude-sonnet-4-5}"
 
 	# opencode.json
@@ -374,7 +384,9 @@ cmd_create() {
 	rollback_register rm_file "$PROJECT_DIR/opencode.json"
 
 	# AGENTS.md
-	if [[ -n "$ROLE_FILE" ]]; then
+	if [[ "$ROLE_FILE" == "__KEEP_EXISTING__" ]]; then
+		echo "Keeping existing AGENTS.md"
+	elif [[ -n "$ROLE_FILE" ]]; then
 		[[ -f "$ROLE_FILE" ]] || die "Role file not found: $ROLE_FILE"
 		/bin/cp "$ROLE_FILE" "$PROJECT_DIR/AGENTS.md"
 	elif [[ -n "$ROLE" ]]; then

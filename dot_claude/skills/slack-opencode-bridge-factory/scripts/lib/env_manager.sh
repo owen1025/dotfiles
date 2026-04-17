@@ -103,7 +103,7 @@ agent_env_write() {
 	while [[ $# -ge 2 ]]; do
 		local key="$1"
 		local val="$2"
-		echo "${key}=${val}" >>"$env_file"
+		echo "export ${key}=${val}" >>"$env_file"
 		shift 2
 	done
 

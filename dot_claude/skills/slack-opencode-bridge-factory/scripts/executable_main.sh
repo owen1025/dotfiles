@@ -28,8 +28,11 @@ EOF
 }
 
 case "${1:-}" in
-create | finalize)
+create)
 	shift
+	exec bash "$SKILL_DIR/scripts/create.sh" "${@}"
+	;;
+finalize)
 	exec bash "$SKILL_DIR/scripts/create.sh" "${@}"
 	;;
 list)
