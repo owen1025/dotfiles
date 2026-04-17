@@ -178,11 +178,14 @@ def process_mention(
         response = collect_response(session_id)
 
         chunks = chunk_text(response)
+        # Slack chat.update has 3001-char limit; chat.postMessage allows 40000 — delete placeholder then post
+        if pending_ts:
+            try:
+                app.client.chat_delete(channel=channel, ts=pending_ts)
+            except Exception as e:
+                log.warning(f"Could not delete pending message: {e}")
         for i, chunk in enumerate(chunks):
-            if i == 0 and pending_ts:
-                app.client.chat_update(channel=channel, ts=pending_ts, text=chunk)
-            else:
-                say(text=chunk, thread_ts=thread_ts)
+            say(text=chunk, thread_ts=thread_ts)
             log.info(f"Sent chunk {i + 1}/{len(chunks)} to thread {thread_ts}")
 
     except requests.ConnectionError:
