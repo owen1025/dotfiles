@@ -98,8 +98,8 @@ registry_delete "$AGENT_NAME"
 if $PURGE_PROJECT; then
 	echo "Purging project: $PROJECT_DIR"
 	if [[ -d "$PROJECT_DIR" ]]; then
-		/bin/rm -rf "$PROJECT_DIR/bridge" "$PROJECT_DIR/daemons" "$PROJECT_DIR/opencode.json" "$PROJECT_DIR/AGENTS.md"
-		echo "Project files removed (directory kept)"
+		/bin/rm -rf "$PROJECT_DIR/bridge" "$PROJECT_DIR/daemons" "$PROJECT_DIR/opencode.json"
+		echo "Project bridge/daemons/opencode.json removed (AGENTS.md preserved)"
 	fi
 fi
 
