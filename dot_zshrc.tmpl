@@ -195,7 +195,7 @@ export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 source <(fzf --zsh)
 
 # forgit (installed via brew)
-_FORGIT_PATH="${_BREW_PREFIX}/opt/forgit/share/forgit/forgit.plugin.zsh"
+export _FORGIT_PATH="${_BREW_PREFIX}/opt/forgit/share/forgit/forgit.plugin.zsh"
 [ -f "$_FORGIT_PATH" ] && source "$_FORGIT_PATH"
 
 # Custom ENV
