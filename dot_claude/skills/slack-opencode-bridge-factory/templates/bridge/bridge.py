@@ -292,7 +292,9 @@ if __name__ == "__main__":
     except Exception as e:
         log.warning(f"Session cleanup failed (non-fatal): {e}")
 
-    log.info("Starting Secretary Bridge...")
+    log.info(
+        f"Starting OpenCode Bridge (agent: {os.environ.get('AGENT_NAME', 'unknown')})..."
+    )
     log.info(f"OpenCode URL: {OPENCODE_URL}")
     log.info(f"Allowed users: {ALLOWED_USERS or '(all — SLACK_OWNER_ID not set)'}")
 
