@@ -366,3 +366,11 @@ ss-analyze() {
     echo "No screenshots found in $SCREENSHOT_DIR"
   fi
 }
+
+# ####################### Welcome Screen #######################
+# fastfetch: pretty system info on new interactive shells
+# Skip inside tmux panes (only shown on the outer terminal) and for non-interactive shells
+if [[ -o interactive ]] && [[ -z "$TMUX" ]] && [[ -z "$FASTFETCH_SHOWN" ]] && command -v fastfetch &>/dev/null; then
+  fastfetch
+  export FASTFETCH_SHOWN=1
+fi
