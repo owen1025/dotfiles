@@ -7,12 +7,22 @@ source "$SKILL_DIR/scripts/lib/registry.sh"
 source "$SKILL_DIR/scripts/lib/daemon.sh"
 source "$SKILL_DIR/scripts/lib/slack_integration.sh"
 
-AGENT_NAME="${1:-}"
-[[ -z "$AGENT_NAME" ]] && {
-	echo "Usage: update.sh <agent-name> [--model M] [--role-file P] [--rotate-tokens] [--port N]" >&2
-	exit 1
-}
-shift
+SYNC_BRIDGE=false
+AGENT_NAME=""
+
+# First arg: --sync-bridge (all agents) or agent name
+if [[ "${1:-}" == "--sync-bridge" ]]; then
+	SYNC_BRIDGE=true
+	shift
+else
+	AGENT_NAME="${1:-}"
+	[[ -z "$AGENT_NAME" ]] && {
+		echo "Usage: update.sh <agent-name> [--model M] [--role-file P] [--rotate-tokens] [--port N] [--sync-bridge]" >&2
+		echo "       update.sh --sync-bridge" >&2
+		exit 1
+	}
+	shift
+fi
 
 NEW_MODEL=""
 ROLE_FILE=""
@@ -37,6 +47,10 @@ while [[ $# -gt 0 ]]; do
 		NEW_PORT="$2"
 		shift 2
 		;;
+	--sync-bridge)
+		SYNC_BRIDGE=true
+		shift
+		;;
 	*)
 		echo "ERROR: Unknown option: $1" >&2
 		exit 1
@@ -45,6 +59,127 @@ while [[ $# -gt 0 ]]; do
 done
 
 registry_init
+
+sync_bridge_all() {
+	local -a targets=()
+	if [[ -n "$AGENT_NAME" ]]; then
+		registry_exists "$AGENT_NAME" || {
+			echo "ERROR: Agent '$AGENT_NAME' not found" >&2
+			return 1
+		}
+		targets=("$AGENT_NAME")
+	else
+		while IFS= read -r line; do
+			[[ -n "$line" ]] && targets+=("$line")
+		done < <(registry_list)
+	fi
+
+	[[ ${#targets[@]} -eq 0 ]] && {
+		echo "No agents to sync"
+		return 0
+	}
+
+	echo "=== Pre-flight: validating ${#targets[@]} agents ==="
+	local -a valid_agents=()
+	local -a invalid_agents=()
+	for agent in "${targets[@]}"; do
+		entry=$(registry_get "$agent")
+		proj=$(echo "$entry" | jq -r '.project_dir')
+		if [[ ! -d "$proj/bridge" ]] || [[ ! -d "$proj/bridge/.venv" ]]; then
+			echo "SKIP: $agent — invalid project structure at $proj"
+			invalid_agents+=("$agent")
+			continue
+		fi
+		valid_agents+=("$agent")
+	done
+
+	[[ ${#valid_agents[@]} -eq 0 ]] && {
+		echo "No valid agents to sync"
+		return 1
+	}
+
+	echo "=== Updating bridge code (${#valid_agents[@]} agents) ==="
+	local -a updated_agents=()
+	local -a failed_agents=()
+	TMPL_BRIDGE="$SKILL_DIR/templates/bridge"
+	for agent in "${valid_agents[@]}"; do
+		entry=$(registry_get "$agent")
+		proj=$(echo "$entry" | jq -r '.project_dir')
+
+		/bin/cp "$proj/bridge/bridge.py" "$proj/bridge/bridge.py.bak.$(date +%s)" 2>/dev/null || true
+
+		if /bin/cp "$TMPL_BRIDGE/bridge.py" "$proj/bridge/bridge.py.new" &&
+			/bin/cp "$TMPL_BRIDGE/session_store.py" "$proj/bridge/session_store.py.new" &&
+			/bin/cp "$TMPL_BRIDGE/requirements.txt" "$proj/bridge/requirements.txt.new"; then
+			mv "$proj/bridge/bridge.py.new" "$proj/bridge/bridge.py"
+			mv "$proj/bridge/session_store.py.new" "$proj/bridge/session_store.py"
+			mv "$proj/bridge/requirements.txt.new" "$proj/bridge/requirements.txt"
+
+			if "$proj/bridge/.venv/bin/pip" install -q -r "$proj/bridge/requirements.txt" 2>/dev/null; then
+				echo "UPDATED: $agent"
+				updated_agents+=("$agent")
+			else
+				echo "FAIL: $agent — pip install failed"
+				failed_agents+=("$agent")
+			fi
+		else
+			echo "FAIL: $agent — file copy failed"
+			failed_agents+=("$agent")
+		fi
+	done
+
+	[[ ${#updated_agents[@]} -eq 0 ]] && {
+		echo "No agents successfully updated."
+		return 1
+	}
+
+	echo "=== Simultaneous restart (${#updated_agents[@]} agents) ==="
+	for agent in "${updated_agents[@]}"; do
+		entry=$(registry_get "$agent")
+		oc_label=$(echo "$entry" | jq -r '.daemon.opencode_label')
+		br_label=$(echo "$entry" | jq -r '.daemon.bridge_label')
+		(
+			restart_daemon "$oc_label" 2>/dev/null
+			restart_daemon "$br_label" 2>/dev/null
+		) &
+	done
+	wait
+
+	echo "=== Health check ==="
+	local -a healthy=()
+	local -a unhealthy=()
+	for agent in "${updated_agents[@]}"; do
+		entry=$(registry_get "$agent")
+		port=$(echo "$entry" | jq -r '.port')
+		local ok=false
+		for i in $(seq 1 10); do
+			sleep 2
+			if curl -sf "http://localhost:$port/global/health" >/dev/null 2>&1; then
+				ok=true
+				break
+			fi
+		done
+		if $ok; then
+			healthy+=("$agent")
+			echo "HEALTHY: $agent"
+		else
+			unhealthy+=("$agent")
+			echo "UNHEALTHY: $agent (port $port not responding)"
+		fi
+	done
+
+	echo ""
+	echo "=== Sync Summary ==="
+	echo "Updated: ${#updated_agents[@]} | Healthy: ${#healthy[@]} | Unhealthy: ${#unhealthy[@]} | Failed update: ${#failed_agents[@]} | Skipped: ${#invalid_agents[@]}"
+	[[ ${#unhealthy[@]} -gt 0 || ${#failed_agents[@]} -gt 0 ]] && return 1
+	return 0
+}
+
+if $SYNC_BRIDGE; then
+	sync_bridge_all
+	exit $?
+fi
+
 registry_exists "$AGENT_NAME" || {
 	echo "ERROR: Agent '$AGENT_NAME' not found" >&2
 	exit 1
