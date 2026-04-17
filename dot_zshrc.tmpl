@@ -12,6 +12,9 @@ elif [[ -x "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
 else
   _BREW_PREFIX=""
 fi
+{{ if eq .chezmoi.os "linux" -}}
+[[ -n "$_BREW_PREFIX" ]] && eval "$("$_BREW_PREFIX/bin/brew" shellenv)"
+{{- end }}
 
 # Path to your oh-my-zsh installation.
 export ZSH="${HOME}/.oh-my-zsh"
