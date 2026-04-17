@@ -10,6 +10,9 @@ Brewfile.lock.json
 node_modules/
 sessions/
 
+# oh-my-openagent.json: user-managed by upstream omo CLI; do not sync via dotfiles
+.config/opencode/oh-my-openagent.json
+
 {{ if eq .chezmoi.os "linux" -}}
 Library/**
 Documents/EdgeMark/**
