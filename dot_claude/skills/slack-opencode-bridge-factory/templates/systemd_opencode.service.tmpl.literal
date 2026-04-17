@@ -1,0 +1,15 @@
+[Unit]
+Description=OpenCode {{AGENT_NAME}} serve
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash {{WRAPPER_OPENCODE}}
+Restart=always
+RestartSec=10
+StandardOutput=append:{{LOG_DIR}}/opencode.log
+StandardError=append:{{LOG_DIR}}/opencode.log
+
+[Install]
+WantedBy=default.target

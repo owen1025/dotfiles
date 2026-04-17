@@ -1,0 +1,16 @@
+[Unit]
+Description=OpenCode {{AGENT_NAME}} bridge
+After=network-online.target {{AGENT_NAME}}-opencode.service
+Wants=network-online.target
+Requires={{AGENT_NAME}}-opencode.service
+
+[Service]
+Type=simple
+ExecStart=/bin/bash {{WRAPPER_BRIDGE}}
+Restart=always
+RestartSec=10
+StandardOutput=append:{{LOG_DIR}}/bridge.log
+StandardError=append:{{LOG_DIR}}/bridge.log
+
+[Install]
+WantedBy=default.target
