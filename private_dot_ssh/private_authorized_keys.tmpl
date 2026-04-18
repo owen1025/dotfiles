@@ -1,0 +1,21 @@
+{{- /* authorized_keys — SSH public keys allowed to log in as this user.
+       Only deployed on Linux machines (GCP/server role).
+       Mac machines are clients, not servers, so this file is not created there.
+
+       Managed via chezmoi. To add a new key:
+         1. Append the key below with a comment identifying the device/owner
+         2. Commit + push + `chezmoi apply`
+*/ -}}
+{{- if eq .chezmoi.os "linux" }}
+# iPhone 15 Pro (moshi app, Secure Enclave)
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILVWL+XnhoTaJChvKqNEai54St9WDOW+hgTHwrHVhCeG moshi-iphone
+
+# iPad (moshi app, Secure Enclave)
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIWzzj+7L1zODh0ZRV1AAzqRNd4Ibr+SILHvUXIoLLQw moshi-ipad
+
+# Personal Mac
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJtz8kTrM/SVN5+ykowFBE6r4l6t3nL7aQrkPf/iHLje myartame@gmail.com
+
+# Work Mac (used as secondary server)
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBRGA69jYvoV42PkRy0fdIOYMNYHVIpAl9hIMVGoPowW jepil@gowid.com
+{{- end }}
