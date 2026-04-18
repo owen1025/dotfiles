@@ -7,11 +7,10 @@
          2. Commit + push + `chezmoi apply`
 */ -}}
 {{- if eq .chezmoi.os "linux" }}
-# iPhone 15 Pro (moshi app, Secure Enclave)
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILVWL+XnhoTaJChvKqNEai54St9WDOW+hgTHwrHVhCeG moshi-iphone
-
-# iPad (moshi app, Secure Enclave)
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIWzzj+7L1zODh0ZRV1AAzqRNd4Ibr+SILHvUXIoLLQw moshi-ipad
+# Moshi mobile (shared across iPhone + iPad via iCloud Drive import)
+# Private key stored in iCloud Drive; imported into moshi app on each device.
+# Fingerprint: SHA256:BhTKrFu4J4r4uCwXnq3tuIWGbxafcSnfQkAwRYp40S4
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB9p0yfJQ0pO+iorSQMYiBxYyw2vL+hpyDOUgasJ6gga moshi-mobile
 
 # Personal Mac
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJtz8kTrM/SVN5+ykowFBE6r4l6t3nL7aQrkPf/iHLje myartame@gmail.com
