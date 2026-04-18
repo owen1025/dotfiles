@@ -33,6 +33,7 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply owen1025
   ├── dot_config/
   │   ├── nvim/                   ← neovim (init.vim → sources .vimrc, coc-settings.json)
   │   ├── opencode/               ← OpenCode CLI 설정 (opencode.json, oh-my-openagent.json 등)
+  │   │   └── skills/             ← 커스텀 skill (english-conversation-trainer, vpn-manager)
   │   └── k9s/                    ← k9s 쿠버네티스 UI (config, hotkey, skin, views)
   ├── private_Library/            ← Ghostty 터미널 설정
   ├── private_dot_ssh/                    ← SSH 설정 (config.tmpl — macOS 1Password IdentityAgent 분기)
@@ -44,7 +45,8 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply owen1025
   ├── run_once_*.sh               ← 1회 실행 (Claude Code 설치, zshrc.local 복사)
   ├── run_once_install-linux-zsh-default.sh  ← Linux only: /etc/shells 등록 + chsh 자동화
   ├── run_once_install-docker.sh             ← Linux only: Docker CE + compose plugin
-  └── run_once_install-ngrok.sh              ← Linux only: ngrok CLI
+  ├── run_once_install-ngrok.sh              ← Linux only: ngrok CLI
+  └── run_once_install-opencode-skills.sh    ← OpenCode/Agent skill 설치 (git clone + npx skills)
 ```
 
 ## Key Conventions
@@ -240,6 +242,7 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply owen1025
 6. `run_once_install-linux-zsh-default.sh` — `/etc/shells` 편집 + `chsh -s` 자동
 7. `run_once_install-docker.sh` — Docker CE + compose plugin
 8. `run_once_install-ngrok.sh` — ngrok CLI
+9. `run_once_install-opencode-skills.sh` — OpenCode/Agent skill 설치 (git clone + npx skills add)
 
 ### Post-install (수동)
 
