@@ -1,0 +1,33 @@
+# ~/.zshenv — loaded by ALL zsh invocations, including non-interactive SSH commands
+#
+# Why this file exists:
+#   When Mosh (moshi iOS app, mosh CLI, etc.) connects, it runs:
+#     ssh user@host 'mosh-server new'
+#   That command executes in a non-interactive, non-login shell.
+#   zsh only loads ~/.zshenv for non-interactive shells — NOT ~/.zshrc or ~/.zprofile.
+#   Without brew in PATH here, `mosh-server` is not found and moshi silently falls back to SSH.
+#
+# CRITICAL: This file must NOT produce any stdout/stderr output.
+#   Mosh parses the server's first output line as `MOSH CONNECT <port> <key>`.
+#   Any echo/printf here will corrupt the handshake and break mosh.
+
+# Detect brew prefix (same logic as dot_zshrc.tmpl for consistency)
+# Order: Apple Silicon (/opt/homebrew) → Linuxbrew (/home/linuxbrew/.linuxbrew) → none
+if [[ -x "/opt/homebrew/bin/brew" ]]; then
+  _BREW_PREFIX="/opt/homebrew"
+elif [[ -x "/home/linuxbrew/.linuxbrew/bin/brew" ]]; then
+  _BREW_PREFIX="/home/linuxbrew/.linuxbrew"
+else
+  _BREW_PREFIX=""
+fi
+
+# Load brew environment (PATH, MANPATH, INFOPATH, HOMEBREW_*).
+# On macOS, /etc/zprofile runs path_helper for login shells, but non-interactive
+# shells never see it — so we must set it here explicitly.
+# On Linux, brew is not in any system default PATH, so this is required.
+[[ -n "$_BREW_PREFIX" ]] && eval "$("$_BREW_PREFIX/bin/brew" shellenv)" >/dev/null 2>&1
+
+# Ensure UTF-8 locale for mosh-server (it refuses to start without one).
+# Safe defaults; ~/.zshrc can override for interactive sessions.
+export LANG="${LANG:-en_US.UTF-8}"
+export LC_ALL="${LC_ALL:-en_US.UTF-8}"
