@@ -174,18 +174,27 @@ def chunk_text(text: str, max_len: int = SLACK_MAX_LEN) -> list[str]:
 # ── 메인 핸들러 ───────────────────────────────────────
 
 
+PROGRESS_REACTION = "hourglass_flowing_sand"
+
+
+def _remove_progress_reaction(channel: str, ts: str) -> None:
+    try:
+        app.client.reactions_remove(
+            channel=channel, timestamp=ts, name=PROGRESS_REACTION
+        )
+    except Exception as e:
+        log.warning(f"Could not remove progress reaction: {e}")
+
+
 def process_mention(
-    text: str, thread_ts: str, channel: str, say, pending_ts: str | None = None
+    text: str, thread_ts: str, channel: str, say, trigger_ts: str | None = None
 ) -> None:
     try:
         current_depth = increment_depth(thread_ts)
         if current_depth > AGENT_DEPTH_LIMIT:
             warning_msg = f"⚠️ 에이전트 응답 체인 한도({AGENT_DEPTH_LIMIT}) 초과. 체인을 중단합니다. (depth={current_depth})"
-            if pending_ts:
-                try:
-                    app.client.chat_delete(channel=channel, ts=pending_ts)
-                except Exception:
-                    pass
+            if trigger_ts:
+                _remove_progress_reaction(channel, trigger_ts)
             say(text=warning_msg, thread_ts=thread_ts)
             return
 
@@ -202,30 +211,25 @@ def process_mention(
         response = collect_response(session_id)
 
         chunks = chunk_text(response)
-        # Slack chat.update has 3001-char limit; chat.postMessage allows 40000 — delete placeholder then post
-        if pending_ts:
-            try:
-                app.client.chat_delete(channel=channel, ts=pending_ts)
-            except Exception as e:
-                log.warning(f"Could not delete pending message: {e}")
+        if trigger_ts:
+            _remove_progress_reaction(channel, trigger_ts)
         for i, chunk in enumerate(chunks):
             say(text=chunk, thread_ts=thread_ts)
             log.info(f"Sent chunk {i + 1}/{len(chunks)} to thread {thread_ts}")
 
     except requests.ConnectionError:
         log.error("Cannot connect to OpenCode serve")
-        err = "에이전트 연결 실패. opencode serve가 실행 중인지 확인해주세요."
-        if pending_ts:
-            app.client.chat_update(channel=channel, ts=pending_ts, text=err)
-        else:
-            say(text=err, thread_ts=thread_ts)
+        if trigger_ts:
+            _remove_progress_reaction(channel, trigger_ts)
+        say(
+            text="에이전트 연결 실패. opencode serve가 실행 중인지 확인해주세요.",
+            thread_ts=thread_ts,
+        )
     except Exception as e:
         log.error(f"Unexpected error in process_mention: {e}", exc_info=True)
-        err = f"처리 중 오류가 발생했습니다: {e}"
-        if pending_ts:
-            app.client.chat_update(channel=channel, ts=pending_ts, text=err)
-        else:
-            say(text=err, thread_ts=thread_ts)
+        if trigger_ts:
+            _remove_progress_reaction(channel, trigger_ts)
+        say(text=f"처리 중 오류가 발생했습니다: {e}", thread_ts=thread_ts)
 
 
 @app.event("app_mention")
@@ -252,12 +256,17 @@ def handle_mention(event, say):
 
     log.info(f"Mention from {user_id} in {channel}/{thread_ts}: {text[:80]}")
 
-    pending = say(text="처리 중...", thread_ts=thread_ts)
-    pending_ts = pending.get("ts") if pending else None
+    trigger_ts = event["ts"]
+    try:
+        app.client.reactions_add(
+            channel=channel, timestamp=trigger_ts, name=PROGRESS_REACTION
+        )
+    except Exception as e:
+        log.warning(f"Could not add progress reaction: {e}")
 
     t = threading.Thread(
         target=process_mention,
-        args=(text, thread_ts, channel, say, pending_ts),
+        args=(text, thread_ts, channel, say, trigger_ts),
         daemon=True,
     )
     t.start()
@@ -300,12 +309,18 @@ def handle_thread_message(event, say, context):
         f"Thread reply from {user_id} in {event['channel']}/{thread_ts}: {text[:80]}"
     )
 
-    pending = say(text="처리 중...", thread_ts=thread_ts)
-    pending_ts = pending.get("ts") if pending else None
+    channel = event["channel"]
+    trigger_ts = event["ts"]
+    try:
+        app.client.reactions_add(
+            channel=channel, timestamp=trigger_ts, name=PROGRESS_REACTION
+        )
+    except Exception as e:
+        log.warning(f"Could not add progress reaction: {e}")
 
     t = threading.Thread(
         target=process_mention,
-        args=(text, thread_ts, event["channel"], say, pending_ts),
+        args=(text, thread_ts, channel, say, trigger_ts),
         daemon=True,
     )
     t.start()

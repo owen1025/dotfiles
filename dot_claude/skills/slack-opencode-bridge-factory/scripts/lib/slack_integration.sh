@@ -43,7 +43,9 @@ generate_manifest() {
             "app_mentions:read",
             "chat:write",
             "channels:history",
-            "channels:read"
+            "channels:read",
+            "users:write",
+            "reactions:write"
           ]
         }
       },
@@ -69,7 +71,7 @@ factory_create_bot() {
 	ensure_factory_installed
 	bash "$FACTORY_CREATE" "$workspace" "$agent_name" "$display_name" \
 		"true" \
-		"app_mentions:read,chat:write,channels:history,channels:read" \
+		"app_mentions:read,chat:write,channels:history,channels:read,users:write,reactions:write" \
 		"app_mention,message.channels"
 }
 

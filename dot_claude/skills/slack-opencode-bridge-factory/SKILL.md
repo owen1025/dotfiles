@@ -143,6 +143,11 @@ Removes daemons, env vars, registry entry. Preserves Slack App and project by de
 - Requires `users:write` scope (added by default in v4+)
 - Existing bots created before v4 must reinstall app to grant new scope
 
+**Progress indicator**:
+- Uses `reactions:write` scope — bot adds ⏳ reaction on trigger message while processing, removes when done
+- Bots created before this feature must reinstall app to grant `reactions:write`
+- Chosen over text "처리 중..." message to avoid cross-bot confusion in multi-agent threads
+
 ## Dependencies
 - `slack-bot-factory` skill (`~/.claude/skills/omc-learned/slack-bot-factory/`)
 - `jq` (JSON processing)
