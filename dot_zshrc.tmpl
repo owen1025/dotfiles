@@ -65,7 +65,15 @@ alias la="eza -la --icons"
 alias lt="eza --tree --icons"
 
 # Custom bat alias (modern cat replacement)
-alias cat="bat"
+# Use bat only when stdout is a TTY — pipe/redirect falls back to real cat
+# so `cat file | pbcopy`, `cat >> file`, scripts 등에서 bat의 formatting 개입 방지
+cat() {
+  if [[ -t 1 ]]; then
+    command bat "$@"
+  else
+    command cat "$@"
+  fi
+}
 
 # Custom brew alias
 alias bi="brew install"
