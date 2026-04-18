@@ -289,3 +289,94 @@ chezmoi init --apply --promptString email=you@example.com \
 - **forgit config 변수 export 필요** — forgit 최신 버전은 `_FORGIT_PATH` 등 설정 변수를 `export`로 요구 (미지원 시 deprecation warning)
 - **tmux 3.6a + mosh OSC 52 클립보드 (macOS & Linux 동일)** — `set -s set-clipboard on`으로는 mosh 클라이언트까지 OSC 52가 전달되지 않음 (tmux 서버가 sequence를 소비/변조). **양쪽 OS 모두** DCS passthrough 방식 필요: `set -s set-clipboard off` + `set -g allow-passthrough all` + `copy-mode-vi` 바인딩을 `run-shell -b 'tmux-osc52-copy'`로 오버라이드. 스크립트는 `printf '\ePtmux;\e\e]52;c;<base64>\a\e\\'`를 `#{pane_tty}`에 write → tmux가 DCS wrap만 strip하고 outer terminal로 forward. mosh 1.4.0은 selection prefix `c;` 강제. `dot_tmux.conf.local.tmpl`의 OS 분기 없음 (양쪽 동일 로직). `tmux-osc52-copy`의 `pbcopy` fallback은 `command -v` guard로 Linux에서 no-op
 - **Ghostty `clipboard-write` 설정** — 기본값 `ask`이면 OSC 52 수신 시 팝업으로 허용 요청. 반복 사용 시 `clipboard-write = allow`로 바꿔야 매끄러움. (`deny`면 OSC 52 무시됨)
+
+## Managed Skills
+
+이 dotfiles repo는 OMC(Claude Code) + OMO(OpenCode) 양쪽에서 공유하는 일부 스킬도 관리한다.
+
+### `slack-opencode-bridge-factory`
+
+**위치:**
+- Master: `dot_claude/skills/slack-opencode-bridge-factory/` (chezmoi 관리)
+- OMO 심볼릭 링크: `~/.config/opencode/skills/slack-opencode-bridge-factory` → master
+  - 생성 자동화: `run_once_setup-omo-skills-symlinks.sh`
+
+**역할:** OpenCode 에이전트를 Slack 봇으로 브릿지 (Socket Mode + launchd/systemd)
+
+**서브커맨드:** `create`, `finalize`, `list`, `restart`, `logs`, `update`, `delete`, `migrate`, `refresh-peers`
+
+**디렉토리 구조:**
+```
+dot_claude/skills/slack-opencode-bridge-factory/
+├── SKILL.md                            # skill 엔트리 + triggers
+├── scripts/
+│   ├── main.sh                         # 서브커맨드 라우터
+│   ├── create.sh, finalize.sh, ...     # 각 커맨드
+│   └── lib/
+│       ├── detect_os.sh                # OS 감지 + brew_bin_path (macOS/Linux)
+│       ├── daemon.sh → daemon_macos.sh OR daemon_linux.sh
+│       ├── registry.sh                 # ~/.config/opencode-bridges/registry.json CRUD
+│       ├── env_manager.sh              # ~/.zshrc.local 안전 업서트
+│       ├── opencode_json.sh            # 기존 opencode.json 병합 (JSONC 거부)
+│       ├── kg_writer.sh                # Memory MCP 엔티티 JSON 출력
+│       ├── agents_md.sh                # BRIDGE_PEERS/BRIDGE_INFO 마커 주입
+│       ├── slack_integration.sh        # slack-bot-factory wrapper
+│       └── port_scan.sh                # 4096-4196 충돌 회피
+└── templates/
+    ├── bridge/bridge.py                # Slack↔OpenCode 브릿지 (파라미터화)
+    ├── opencode.json.tmpl              # agent.build 설정
+    ├── AGENTS.md.tmpl                  # role placeholder
+    ├── slack_manifest.json.tmpl        # Slack App manifest (scopes 포함)
+    ├── env_file.tmpl                   # 에이전트별 env
+    ├── launchd_{opencode,bridge}.plist.tmpl     # macOS 데몬
+    ├── systemd_{opencode,bridge}.service.tmpl   # Linux 데몬 (V2)
+    └── wrapper_{opencode,bridge}.sh.tmpl        # launchd/systemd exec 타겟
+```
+
+**외부 상태 (chezmoi 밖):**
+- `~/.config/opencode-bridges/registry.json` — 에이전트 메타데이터 (single source of truth)
+- `~/.config/opencode-bridges/{agent}.env` — 에이전트별 env 파일
+- `~/.local/bin/{agent}-*.sh` — wrapper 스크립트 (create 시 생성)
+- `~/Library/LaunchAgents/com.owen.{agent}-*.plist` (macOS) or `~/.config/systemd/user/{agent}-*.service` (Linux)
+- `~/.local/log/opencode-bridges/{agent}/{opencode,bridge}.log`
+
+**의존성:**
+- `dot_claude/skills/omc-learned/slack-bot-factory/` — Slack App 생성 (Manifest API) 위임
+- `~/.zshrc.local`에 `SLACK_{WORKSPACE}_{AGENT}_{BOT,APP}_TOKEN` 환경변수
+- `opencode.json`의 MCP (playwright, slack 등 — 글로벌 `dot_config/opencode/opencode.json.tmpl`에서 관리)
+
+**관련 글로벌 설정:**
+- `dot_config/opencode/opencode.json.tmpl` — 글로벌 MCP 정의 (playwright MCP 포함)
+- wrapper 스크립트에 `{{BREW_PATH}}` 치환 주입됨 (launchd/systemd minimal PATH 대응)
+
+**에이전트가 스킬 파일 수정 시 주의사항:**
+
+1. **commit은 반드시 dotfiles에서:**
+   ```bash
+   chezmoi add ~/.claude/skills/slack-opencode-bridge-factory
+   cd ~/Desktop/owen/dotfiles
+   git add dot_claude/skills/slack-opencode-bridge-factory
+   git commit -m "..." && git push
+   ```
+   스킬 디렉토리 내부에서 `git init`/`git commit` 하면 chezmoi가 `.git` 포함해버림.
+
+2. **`.tmpl` 파일명 주의** — chezmoi가 내부적으로 `.literal` suffix 처리. 스크립트에서 `ls templates/opencode.json.tmpl*`로 와일드카드 검색.
+
+3. **`__pycache__/`** — chezmoi add 시 실수로 포함될 수 있음. `.chezmoiignore`나 commit 전 `rm -rf` 필요.
+
+4. **스킬 변경 후 기존 에이전트 반영:**
+   - bridge.py 코드 변경 → `omo-bridge update --sync-bridge` (동시 재시작)
+   - wrapper 템플릿 변경 → `omo-bridge update <agent>` (model 플래그 주면 재생성 안 됨, wrapper는 기본 재생성 플래그 별도 필요 — 현재는 수동 또는 `delete` + `create` 재설치)
+   - env 파일 변경 → `agent_env_set` 사용, 전체 재작성 금지
+
+5. **OS-agnostic:**
+   - macOS + Ubuntu 24.04 양쪽에서 동작해야 함
+   - `local path=` 금지 (zsh PATH 변수 충돌)
+   - bare `rm`, `cp` 대신 `/bin/rm`, `/bin/cp` (function 내부)
+   - `brew_bin_path` 함수로 Homebrew 경로 분기
+
+### 새 관리 대상 스킬 추가 시
+
+1. `dot_claude/skills/<skill-name>/` 작성 (chezmoi 자동 관리)
+2. OMO에도 심볼릭 링크 필요하면 `run_once_setup-omo-skills-symlinks.sh`의 `SHARED_SKILLS` 배열에 추가
+3. AGENTS.md의 "Managed Skills" 섹션에 항목 추가 (이 섹션)
