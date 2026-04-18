@@ -268,6 +268,7 @@ cmd_finalize() {
 
 	source "$SKILL_DIR/scripts/lib/agents_md.sh"
 	inject_peers_marker "$PROJECT_DIR/AGENTS.md" || echo "WARN: Could not inject peers marker"
+	inject_bridge_info "$PROJECT_DIR/AGENTS.md" "$AGENT_NAME" "$PORT" "$OC_LABEL" "$BR_LABEL" "$LOG_DIR" || echo "WARN: Could not inject bridge info"
 
 	rollback_commit
 

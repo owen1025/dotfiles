@@ -368,6 +368,7 @@ say "Sessions DB rows: before=$DB_ROWS_BEFORE, after=$DB_ROWS_AFTER"
 
 source "$SKILL_DIR/scripts/lib/agents_md.sh"
 inject_peers_marker "$PROJECT_DIR/AGENTS.md" 2>/dev/null || echo "WARN: Could not inject peers marker"
+inject_bridge_info "$PROJECT_DIR/AGENTS.md" "$AGENT_NAME" "$PORT" "$NEW_OC_LABEL" "$NEW_BR_LABEL" "$LOG_DIR" 2>/dev/null || echo "WARN: Could not inject bridge info"
 
 say ""
 say "Migration complete for '$AGENT_NAME'"
