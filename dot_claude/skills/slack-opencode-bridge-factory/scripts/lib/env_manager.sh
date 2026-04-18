@@ -110,6 +110,37 @@ agent_env_write() {
 	chmod 600 "$env_file"
 }
 
+# Upsert a single key in agent env file (preserves other keys)
+# Usage: agent_env_set {agent} {key} {value}
+agent_env_set() {
+	local agent="$1"
+	local key="$2"
+	local val="$3"
+
+	[[ -z "$agent" || -z "$key" ]] && {
+		echo "ERROR: agent_env_set requires agent and key" >&2
+		return 1
+	}
+
+	local env_file="${AGENT_ENV_DIR}/${agent}.env"
+	[[ ! -f "$env_file" ]] && {
+		echo "ERROR: env file not found: $env_file" >&2
+		return 1
+	}
+
+	if grep -q "^export ${key}=" "$env_file"; then
+		local tmp
+		tmp=$(mktemp)
+		awk -v k="$key" -v v="$val" '
+			$0 ~ "^export " k "=" { print "export " k "=\"" v "\""; next }
+			{ print }
+		' "$env_file" >"$tmp" && mv "$tmp" "$env_file"
+	else
+		echo "export ${key}=\"${val}\"" >>"$env_file"
+	fi
+	chmod 600 "$env_file"
+}
+
 # Delete agent-specific .env file
 agent_env_delete() {
 	local agent="$1"

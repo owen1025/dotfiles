@@ -16,7 +16,14 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from session_store import get_session, save_session, touch_session, cleanup_old_sessions
+from session_store import (
+    get_session,
+    save_session,
+    touch_session,
+    cleanup_old_sessions,
+    increment_depth,
+    reset_depth,
+)
 
 # ── 설정 ──────────────────────────────────────────────
 OPENCODE_URL = os.environ.get("OPENCODE_URL", "http://localhost:4096")
@@ -24,6 +31,12 @@ SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
 SLACK_APP_TOKEN = os.environ.get("SLACK_APP_TOKEN", "")
 SLACK_OWNER_ID = os.environ.get("SLACK_OWNER_ID", "")
 ALLOWED_USERS = {uid.strip() for uid in SLACK_OWNER_ID.split(",") if uid.strip()}
+ALLOWED_PEER_BOT_USERS = {
+    u.strip()
+    for u in os.environ.get("ALLOWED_PEER_BOT_USERS", "").split(",")
+    if u.strip()
+}
+AGENT_DEPTH_LIMIT = int(os.environ.get("AGENT_DEPTH_LIMIT", "10"))
 SSE_TIMEOUT = 600
 SLACK_MAX_LEN = 3800
 
@@ -165,6 +178,17 @@ def process_mention(
     text: str, thread_ts: str, channel: str, say, pending_ts: str | None = None
 ) -> None:
     try:
+        current_depth = increment_depth(thread_ts)
+        if current_depth > AGENT_DEPTH_LIMIT:
+            warning_msg = f"⚠️ 에이전트 응답 체인 한도({AGENT_DEPTH_LIMIT}) 초과. 체인을 중단합니다. (depth={current_depth})"
+            if pending_ts:
+                try:
+                    app.client.chat_delete(channel=channel, ts=pending_ts)
+                except Exception:
+                    pass
+            say(text=warning_msg, thread_ts=thread_ts)
+            return
+
         session_id = get_session(thread_ts)
         if session_id:
             log.info(f"Reusing session {session_id} for thread {thread_ts}")
@@ -208,7 +232,11 @@ def process_mention(
 def handle_mention(event, say):
     user_id = event.get("user", "")
 
-    if ALLOWED_USERS and user_id not in ALLOWED_USERS:
+    if (
+        ALLOWED_USERS
+        and user_id not in ALLOWED_USERS
+        and user_id not in ALLOWED_PEER_BOT_USERS
+    ):
         log.warning(f"Unauthorized mention from user {user_id} — ignoring")
         return
 
@@ -237,7 +265,10 @@ def handle_mention(event, say):
 
 @app.event("message")
 def handle_thread_message(event, say, context):
-    if event.get("bot_id") or event.get("subtype"):
+    if event.get("subtype"):
+        return
+    my_bot_user_id = context.get("bot_user_id", "")
+    if event.get("user") == my_bot_user_id:
         return
 
     thread_ts = event.get("thread_ts")
@@ -254,7 +285,11 @@ def handle_thread_message(event, say, context):
         return
 
     user_id = event.get("user", "")
-    if ALLOWED_USERS and user_id not in ALLOWED_USERS:
+    if (
+        ALLOWED_USERS
+        and user_id not in ALLOWED_USERS
+        and user_id not in ALLOWED_PEER_BOT_USERS
+    ):
         return
 
     text = re.sub(r"<@\w+>", "", raw_text).strip()
@@ -299,6 +334,8 @@ if __name__ == "__main__":
     )
     log.info(f"OpenCode URL: {OPENCODE_URL}")
     log.info(f"Allowed users: {ALLOWED_USERS or '(all — SLACK_OWNER_ID not set)'}")
+    log.info(f"Depth limit: {AGENT_DEPTH_LIMIT}")
+    log.info(f"Peer bot users: {ALLOWED_PEER_BOT_USERS or '(none)'}")
 
     handler = SocketModeHandler(app, SLACK_APP_TOKEN)
     handler.start()

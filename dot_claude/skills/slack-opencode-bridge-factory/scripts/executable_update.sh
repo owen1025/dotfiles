@@ -6,19 +6,24 @@ source "$SKILL_DIR/scripts/lib/detect_os.sh"
 source "$SKILL_DIR/scripts/lib/registry.sh"
 source "$SKILL_DIR/scripts/lib/daemon.sh"
 source "$SKILL_DIR/scripts/lib/slack_integration.sh"
+source "$SKILL_DIR/scripts/lib/env_manager.sh"
 
 SYNC_BRIDGE=false
+REFRESH_PEERS=false
 AGENT_NAME=""
 
-# First arg: --sync-bridge (all agents) or agent name
 if [[ "${1:-}" == "--sync-bridge" ]]; then
 	SYNC_BRIDGE=true
+	shift
+elif [[ "${1:-}" == "--refresh-peers" ]]; then
+	REFRESH_PEERS=true
 	shift
 else
 	AGENT_NAME="${1:-}"
 	[[ -z "$AGENT_NAME" ]] && {
-		echo "Usage: update.sh <agent-name> [--model M] [--role-file P] [--rotate-tokens] [--port N] [--sync-bridge]" >&2
+		echo "Usage: update.sh <agent-name> [--model M] [--role-file P] [--rotate-tokens] [--port N] [--sync-bridge] [--refresh-peers]" >&2
 		echo "       update.sh --sync-bridge" >&2
+		echo "       update.sh --refresh-peers [agent-name]" >&2
 		exit 1
 	}
 	shift
@@ -51,6 +56,10 @@ while [[ $# -gt 0 ]]; do
 		SYNC_BRIDGE=true
 		shift
 		;;
+	--refresh-peers)
+		REFRESH_PEERS=true
+		shift
+		;;
 	*)
 		echo "ERROR: Unknown option: $1" >&2
 		exit 1
@@ -59,6 +68,62 @@ while [[ $# -gt 0 ]]; do
 done
 
 registry_init
+
+refresh_peers() {
+	local -a targets=()
+	if [[ -n "$AGENT_NAME" ]]; then
+		registry_exists "$AGENT_NAME" || {
+			echo "ERROR: Agent '$AGENT_NAME' not found" >&2
+			return 1
+		}
+		targets=("$AGENT_NAME")
+	else
+		while IFS= read -r line; do
+			[[ -n "$line" ]] && targets+=("$line")
+		done < <(registry_list)
+	fi
+
+	[[ ${#targets[@]} -eq 0 ]] && {
+		echo "No agents registered"
+		return 0
+	}
+
+	for agent in "${targets[@]}"; do
+		entry=$(registry_get "$agent")
+		my_bot=$(echo "$entry" | jq -r '.slack.bot_user_id // empty')
+		br_label=$(echo "$entry" | jq -r '.daemon.bridge_label')
+
+		if [[ -z "$my_bot" ]]; then
+			echo "SKIP: $agent (no bot_user_id — pending-tokens?)"
+			continue
+		fi
+
+		local -a peers=()
+		while IFS= read -r peer; do
+			[[ -n "$peer" && "$peer" != "$my_bot" ]] && peers+=("$peer")
+		done < <(registry_get_all_bot_user_ids)
+
+		local peers_csv
+		peers_csv=$(
+			IFS=,
+			echo "${peers[*]:-}"
+		)
+
+		echo "Agent '$agent' (bot: $my_bot) — peers: ${peers_csv:-(none)}"
+
+		agent_env_set "$agent" "ALLOWED_PEER_BOT_USERS" "$peers_csv"
+
+		restart_daemon "$br_label" 2>/dev/null || echo "WARN: restart failed for $br_label"
+	done
+
+	echo ""
+	echo "Refreshed peers for ${#targets[@]} agent(s)"
+}
+
+if [[ "$REFRESH_PEERS" == "true" ]]; then
+	refresh_peers
+	exit $?
+fi
 
 sync_bridge_all() {
 	local -a targets=()

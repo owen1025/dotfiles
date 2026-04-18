@@ -12,9 +12,15 @@ def _get_conn():
             thread_ts TEXT PRIMARY KEY,
             session_id TEXT NOT NULL,
             created_at INTEGER NOT NULL,
-            last_used_at INTEGER NOT NULL
+            last_used_at INTEGER NOT NULL,
+            depth INTEGER DEFAULT 0
         )
     """)
+    # Migration: add depth column to existing DBs
+    try:
+        conn.execute("ALTER TABLE thread_sessions ADD COLUMN depth INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # already exists
     conn.commit()
     return conn
 
@@ -41,6 +47,33 @@ def touch_session(thread_ts: str) -> None:
         conn.execute(
             "UPDATE thread_sessions SET last_used_at = ? WHERE thread_ts = ?",
             (int(time.time()), thread_ts),
+        )
+
+
+def get_depth(thread_ts: str) -> int:
+    with _get_conn() as conn:
+        row = conn.execute(
+            "SELECT depth FROM thread_sessions WHERE thread_ts = ?", (thread_ts,)
+        ).fetchone()
+        return row[0] if row else 0
+
+
+def increment_depth(thread_ts: str) -> int:
+    with _get_conn() as conn:
+        conn.execute(
+            "UPDATE thread_sessions SET depth = depth + 1 WHERE thread_ts = ?",
+            (thread_ts,),
+        )
+        row = conn.execute(
+            "SELECT depth FROM thread_sessions WHERE thread_ts = ?", (thread_ts,)
+        ).fetchone()
+        return row[0] if row else 0
+
+
+def reset_depth(thread_ts: str) -> None:
+    with _get_conn() as conn:
+        conn.execute(
+            "UPDATE thread_sessions SET depth = 0 WHERE thread_ts = ?", (thread_ts,)
         )
 
 

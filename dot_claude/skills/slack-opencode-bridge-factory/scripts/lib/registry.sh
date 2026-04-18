@@ -65,3 +65,9 @@ registry_get_field() {
 	local field="$2"
 	registry_get "$name" | jq -r --arg f "$field" '.[$f] // empty'
 }
+
+# Get all bot_user_ids from registered agents (skipping those without bot_user_id)
+registry_get_all_bot_user_ids() {
+	registry_init
+	jq -r '.agents | to_entries[] | .value.slack.bot_user_id // empty' "$REGISTRY_FILE"
+}
