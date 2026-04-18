@@ -1,11 +1,25 @@
 #!/bin/sh
-# tmux-osc52-copy: Send tmux buffer to clipboard via OSC 52 DCS passthrough.
+# tmux-osc52-copy: Send data to clipboard via OSC 52 DCS passthrough.
 # Solves: tmux's built-in set-clipboard fails to emit OSC 52 to mosh clients.
 # Workaround: emit OSC 52 wrapped in DCS passthrough to the pane's TTY,
 # which tmux strips and forwards to the outer terminal (mosh → Ghostty).
+#
+# Data source:
+#   - If stdin is a pipe/redirect (non-TTY): read from stdin
+#     → enables `cat file | pbcopy`, `echo foo | pbcopy`, etc.
+#   - Otherwise: read from tmux buffer
+#     → preserves tmux copy-mode binding (run-shell -b 'tmux-osc52-copy')
 set -eu
 
-buf=$(tmux save-buffer - | base64 | tr -d '\r\n')
+if [ ! -t 0 ]; then
+  # stdin is piped — use it
+  raw=$(cat)
+else
+  # no stdin — fall back to tmux buffer (copy-mode usage)
+  raw=$(tmux save-buffer -)
+fi
+
+buf=$(printf '%s' "$raw" | base64 | tr -d '\r\n')
 pane_tty=$(tmux display-message -p '#{pane_tty}')
 
 # DCS passthrough: \ePtmux;\e<inner-sequence>\e\\
@@ -14,4 +28,4 @@ pane_tty=$(tmux display-message -p '#{pane_tty}')
 printf '\033Ptmux;\033\033]52;c;%s\007\033\\' "$buf" > "$pane_tty"
 
 # Also set local macOS clipboard for direct (non-mosh) sessions
-command -v pbcopy >/dev/null 2>&1 && tmux save-buffer - | pbcopy 2>/dev/null || true
+command -v pbcopy >/dev/null 2>&1 && printf '%s' "$raw" | pbcopy 2>/dev/null || true
