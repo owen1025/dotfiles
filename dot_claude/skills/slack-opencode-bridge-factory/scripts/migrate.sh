@@ -363,5 +363,8 @@ fi
 say ""
 say "Sessions DB rows: before=$DB_ROWS_BEFORE, after=$DB_ROWS_AFTER"
 
+source "$SKILL_DIR/scripts/lib/agents_md.sh"
+inject_peers_marker "$PROJECT_DIR/AGENTS.md" 2>/dev/null || echo "WARN: Could not inject peers marker"
+
 say ""
 say "Migration complete for '$AGENT_NAME'"
