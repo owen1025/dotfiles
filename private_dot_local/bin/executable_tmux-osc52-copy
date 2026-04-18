@@ -1,0 +1,17 @@
+#!/bin/sh
+# tmux-osc52-copy: Send tmux buffer to clipboard via OSC 52 DCS passthrough.
+# Solves: tmux's built-in set-clipboard fails to emit OSC 52 to mosh clients.
+# Workaround: emit OSC 52 wrapped in DCS passthrough to the pane's TTY,
+# which tmux strips and forwards to the outer terminal (mosh → Ghostty).
+set -eu
+
+buf=$(tmux save-buffer - | base64 | tr -d '\r\n')
+pane_tty=$(tmux display-message -p '#{pane_tty}')
+
+# DCS passthrough: \ePtmux;\e<inner-sequence>\e\\
+# Inner: \e]52;c;<base64>\a  (OSC 52, clipboard selection, BEL terminator)
+# mosh 1.4.0 strictly requires 'c;' selection prefix.
+printf '\033Ptmux;\033\033]52;c;%s\007\033\\' "$buf" > "$pane_tty"
+
+# Also set local macOS clipboard for direct (non-mosh) sessions
+command -v pbcopy >/dev/null 2>&1 && tmux save-buffer - | pbcopy 2>/dev/null || true
