@@ -12,6 +12,7 @@ Commands:
   restart  <agent> [--only opencode|bridge]                       Restart agent daemons
   logs     <agent> [--tail N] [--follow] [--only opencode|bridge] Show agent logs
   update   <agent> [--model M] [--role-file P] [--rotate-tokens]  Update agent config
+  refresh-peers [agent]                                            Set ALLOWED_PEER_BOT_USERS in agent env(s)
   delete   <agent> [--force] [--purge-project] [--purge-logs]     Remove agent
   migrate  <agent> [--dry-run]                                    Migrate legacy agent to V1/V2
 
@@ -59,6 +60,10 @@ delete)
 migrate)
 	shift
 	exec bash "$SKILL_DIR/scripts/migrate.sh" "${@}"
+	;;
+refresh-peers)
+	shift
+	exec bash "$SKILL_DIR/scripts/update.sh" --refresh-peers "${@}"
 	;;
 --help | -h | help) usage ;;
 "")
