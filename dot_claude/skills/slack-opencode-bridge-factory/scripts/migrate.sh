@@ -241,6 +241,7 @@ if ! $DRY_RUN; then
 	TMPL_WRAP_OC=$(find_template "wrapper_opencode.sh.tmpl")
 	TMPL_WRAP_BR=$(find_template "wrapper_bridge.sh.tmpl")
 	PYTHON_BIN="$PROJECT_DIR/bridge/.venv/bin/python"
+	BREW_PATH=$(brew_bin_path)
 
 	substitute_template "$TMPL_WRAP_OC" "$WRAPPER_OC" \
 		"AGENT_NAME=$AGENT_NAME" \
@@ -248,7 +249,8 @@ if ! $DRY_RUN; then
 		"LOG_DIR=$LOG_DIR" \
 		"PROJECT_DIR=$PROJECT_DIR" \
 		"OPENCODE_BIN=$OPENCODE_BIN" \
-		"PORT=$PORT"
+		"PORT=$PORT" \
+		"BREW_PATH=$BREW_PATH"
 	chmod +x "$WRAPPER_OC"
 
 	substitute_template "$TMPL_WRAP_BR" "$WRAPPER_BR" \
@@ -256,7 +258,8 @@ if ! $DRY_RUN; then
 		"ENV_FILE=$ENV_FILE" \
 		"LOG_DIR=$LOG_DIR" \
 		"PROJECT_DIR=$PROJECT_DIR" \
-		"PYTHON_BIN=$PYTHON_BIN"
+		"PYTHON_BIN=$PYTHON_BIN" \
+		"BREW_PATH=$BREW_PATH"
 	chmod +x "$WRAPPER_BR"
 fi
 

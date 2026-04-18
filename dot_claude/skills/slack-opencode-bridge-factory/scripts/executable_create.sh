@@ -472,13 +472,17 @@ cmd_create() {
 	tmpl_wrap_oc=$(find_template "wrapper_opencode.sh.tmpl")
 	tmpl_wrap_br=$(find_template "wrapper_bridge.sh.tmpl")
 
+	local brew_path
+	brew_path=$(brew_bin_path)
+
 	substitute_template "$tmpl_wrap_oc" "$wrapper_oc" \
 		"AGENT_NAME=$AGENT_NAME" \
 		"ENV_FILE=$env_file" \
 		"LOG_DIR=$log_dir" \
 		"PROJECT_DIR=$PROJECT_DIR" \
 		"OPENCODE_BIN=$opencode_bin" \
-		"PORT=$PORT"
+		"PORT=$PORT" \
+		"BREW_PATH=$brew_path"
 	chmod +x "$wrapper_oc"
 	rollback_register rm_file "$wrapper_oc"
 
@@ -487,7 +491,8 @@ cmd_create() {
 		"ENV_FILE=$env_file" \
 		"LOG_DIR=$log_dir" \
 		"PROJECT_DIR=$PROJECT_DIR" \
-		"PYTHON_BIN=$python_bin"
+		"PYTHON_BIN=$python_bin" \
+		"BREW_PATH=$brew_path"
 	chmod +x "$wrapper_br"
 	rollback_register rm_file "$wrapper_br"
 

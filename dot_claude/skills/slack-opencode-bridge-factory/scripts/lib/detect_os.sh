@@ -30,6 +30,16 @@ detect_opencode_path() {
 	echo "$opencode_path"
 }
 
+# Platform-specific Homebrew bin path (for PATH injection in wrapper scripts)
+# Needed because launchd/systemd start processes with minimal PATH, missing Homebrew dirs
+brew_bin_path() {
+	case "$OS_TYPE" in
+	macos) echo "/opt/homebrew/bin:/usr/local/bin" ;;
+	linux) echo "/home/linuxbrew/.linuxbrew/bin" ;;
+	*) echo "" ;;
+	esac
+}
+
 # Ensure required dependencies are installed
 ensure_deps() {
 	local missing=()
