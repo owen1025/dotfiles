@@ -7,6 +7,7 @@ source "$SKILL_DIR/scripts/lib/registry.sh"
 source "$SKILL_DIR/scripts/lib/daemon.sh"
 source "$SKILL_DIR/scripts/lib/env_manager.sh"
 source "$SKILL_DIR/scripts/lib/slack_integration.sh"
+source "$SKILL_DIR/scripts/lib/kg_writer.sh"
 
 AGENT_NAME="${1:-}"
 [[ -z "$AGENT_NAME" ]] && {
@@ -108,6 +109,12 @@ if $PURGE_LOGS; then
 	echo "Purging logs: $LOG_DIR"
 	/bin/rm -rf "$LOG_DIR" || true
 fi
+
+echo ""
+echo "=== KG Deletion JSON (for Memory MCP) ==="
+kg_bot_delete_json "$AGENT_NAME"
+kg_agent_delete_json "$AGENT_NAME"
+echo "========================================="
 
 echo ""
 echo "✓ Agent '$AGENT_NAME' deleted."

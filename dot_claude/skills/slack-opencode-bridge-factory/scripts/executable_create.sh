@@ -253,6 +253,22 @@ cmd_finalize() {
 	echo "$kg_json" | jq .
 	echo "=================================================================="
 
+	local role
+	if [[ -f "$PROJECT_DIR/AGENTS.md" ]]; then
+		role=$(awk '/^## Role/{flag=1; next} flag && NF{print; exit}' "$PROJECT_DIR/AGENTS.md" | head -c 200)
+	fi
+	[[ -z "$role" ]] && role="OpenCode agent bridge"
+
+	local agent_kg_json
+	agent_kg_json=$(kg_agent_entity_json "$AGENT_NAME" "$role" "$BOT_USER_ID" "$PROJECT_DIR" "$(echo "$entry" | jq -r '.model')" "$WORKSPACE")
+	echo ""
+	echo "=== Agent Entity JSON (for Memory MCP) ==="
+	echo "$agent_kg_json" | jq .
+	echo "=========================================="
+
+	source "$SKILL_DIR/scripts/lib/agents_md.sh"
+	inject_peers_marker "$PROJECT_DIR/AGENTS.md" || echo "WARN: Could not inject peers marker"
+
 	rollback_commit
 
 	echo ""
