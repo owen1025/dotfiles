@@ -9,6 +9,7 @@ export LINEAR_API_TOKEN=""
 export SLACK_MCP_XOXC_TOKEN=""
 export SLACK_MCP_XOXD_TOKEN=""
 export NTFY_TOPIC=""
+export PLAYWRIGHT_MCP_EXTENSION_TOKEN=""
 
 # === Slack Bot Factory (auto-managed by slack-bot-factory skill) ===
 # Format: SLACK_{WORKSPACE}_{BOT}_{APP_TOKEN|BOT_TOKEN}
