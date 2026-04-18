@@ -21,7 +21,7 @@ elif [[ "${1:-}" == "--refresh-peers" ]]; then
 else
 	AGENT_NAME="${1:-}"
 	[[ -z "$AGENT_NAME" ]] && {
-		echo "Usage: update.sh <agent-name> [--model M] [--role-file P] [--rotate-tokens] [--port N] [--sync-bridge] [--refresh-peers]" >&2
+		echo "Usage: update.sh <agent-name> [--model M] [--role-file P] [--rotate-tokens] [--port N] [--icon <path>] [--sync-bridge] [--refresh-peers]" >&2
 		echo "       update.sh --sync-bridge" >&2
 		echo "       update.sh --refresh-peers [agent-name]" >&2
 		exit 1
@@ -33,6 +33,7 @@ NEW_MODEL=""
 ROLE_FILE=""
 ROTATE_TOKENS=false
 NEW_PORT=""
+ICON_PATH=""
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -50,6 +51,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--port)
 		NEW_PORT="$2"
+		shift 2
+		;;
+	--icon)
+		ICON_PATH="$2"
 		shift 2
 		;;
 	--sync-bridge)
@@ -323,6 +328,33 @@ if [[ -n "$NEW_PORT" ]]; then
 
 	needs_restart=true
 	echo "Port updated: $NEW_PORT"
+fi
+
+# -- icon update --
+if [[ -n "$ICON_PATH" ]]; then
+	[[ -f "$ICON_PATH" ]] || die "Icon file not found: $ICON_PATH"
+
+	case "$ICON_PATH" in
+	*.png | *.jpg | *.jpeg | *.gif) ;;
+	*) die "Icon must be png, jpg, or gif: $ICON_PATH" ;;
+	esac
+
+	bot_token_env=$(echo "$entry" | jq -r '.slack.bot_token_env')
+	bot_token=$(bash -c "source ~/.zshrc.local 2>/dev/null; echo \"\${${bot_token_env}:-}\"")
+	[[ -z "$bot_token" ]] && die "Bot token env var $bot_token_env is empty"
+
+	echo "Uploading icon: $ICON_PATH"
+	response=$(curl -s -F "image=@$ICON_PATH" \
+		-H "Authorization: Bearer $bot_token" \
+		https://slack.com/api/users.setPhoto)
+
+	if echo "$response" | jq -e '.ok' >/dev/null 2>&1; then
+		echo "✓ Icon uploaded successfully"
+	else
+		error=$(echo "$response" | jq -r '.error // "unknown"')
+		die "Icon upload failed: $error"
+	fi
+	# Icon update requires no daemon restart — profile is instant
 fi
 
 if $needs_restart; then

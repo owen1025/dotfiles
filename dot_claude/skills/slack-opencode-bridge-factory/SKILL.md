@@ -104,7 +104,8 @@ omo-bridge update <agent-name> \
   [--model <model-id>] \
   [--role-file <path>] \
   [--rotate-tokens] \      # rotates workspace config token only
-  [--port <number>]
+  [--port <number>] \
+  [--icon <image-path>]    # bot profile image (png/jpg/gif)
 ```
 
 ### delete
@@ -137,6 +138,10 @@ Removes daemons, env vars, registry entry. Preserves Slack App and project by de
 - Single workspace per invocation (default: noanswer)
 - Browser steps required for token acquisition (Slack API limitation)
 - Remote (SSH) installation: V2
+
+**Profile image**:
+- Requires `users:write` scope (added by default in v4+)
+- Existing bots created before v4 must reinstall app to grant new scope
 
 ## Dependencies
 - `slack-bot-factory` skill (`~/.claude/skills/omc-learned/slack-bot-factory/`)
