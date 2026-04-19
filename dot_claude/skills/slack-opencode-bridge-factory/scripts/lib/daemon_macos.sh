@@ -39,25 +39,34 @@ stop_daemon() {
 }
 
 # restart_daemon {label}
+# bootout + bootstrap kills child processes too (kickstart -k only kills the parent,
+# leaving opencode child holding the port → new instance fails with EADDRINUSE).
 restart_daemon() {
 	local label="$1"
-	launchctl kickstart -k "gui/$(id -u)/$label" 2>/dev/null || true
+	local plist="$HOME/Library/LaunchAgents/${label}.plist"
+	launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
+	sleep 1
+	if [[ -f "$plist" ]]; then
+		launchctl bootstrap "gui/$(id -u)" "$plist" 2>/dev/null || true
+	else
+		launchctl kickstart -k "gui/$(id -u)/$label" 2>/dev/null || true
+	fi
 }
 
 # status_daemon {label} → prints "running", "stopped", or "unknown"
+# launchctl list <label> returns a plist-like dict; parse "PID" = N; line.
 status_daemon() {
 	local label="$1"
 	local result
 	result=$(launchctl list "$label" 2>/dev/null)
-	if [[ $? -eq 0 ]]; then
-		# Check if PID is set (non-dash in first column)
-		local pid
-		pid=$(echo "$result" | awk 'NR==2{print $1}' 2>/dev/null || launchctl list | grep "$label" | awk '{print $1}')
-		if [[ "$pid" != "-" && -n "$pid" ]]; then
-			echo "running"
-		else
-			echo "stopped"
-		fi
+	if [[ -z "$result" ]]; then
+		echo "stopped"
+		return
+	fi
+	local pid
+	pid=$(echo "$result" | awk -F'= *' '/"PID"/ {gsub(";","",$2); gsub(" ","",$2); print $2; exit}')
+	if [[ -n "$pid" && "$pid" != "0" ]]; then
+		echo "running"
 	else
 		echo "stopped"
 	fi
