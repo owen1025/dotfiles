@@ -61,6 +61,13 @@ Phase 2 (automated):
 
 ## Commands
 
+> **중요**: `omo-bridge`는 이 문서에서 사용하는 **별칭**일 뿐, 실제 CLI가 아닙니다.
+> 실제 실행은 항상 다음 경로로:
+> ```
+> bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh <subcommand> [options]
+> ```
+> 예: `omo-bridge restart secretary` → `bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh restart secretary`
+
 ### create
 ```bash
 omo-bridge create --name <agent-name> \

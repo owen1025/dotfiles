@@ -365,9 +365,10 @@ dot_claude/skills/slack-opencode-bridge-factory/
 3. **`__pycache__/`** — chezmoi add 시 실수로 포함될 수 있음. `.chezmoiignore`나 commit 전 `rm -rf` 필요.
 
 4. **스킬 변경 후 기존 에이전트 반영:**
-   - bridge.py 코드 변경 → `omo-bridge update --sync-bridge` (동시 재시작)
-   - wrapper 템플릿 변경 → `omo-bridge update <agent>` (model 플래그 주면 재생성 안 됨, wrapper는 기본 재생성 플래그 별도 필요 — 현재는 수동 또는 `delete` + `create` 재설치)
+   - bridge.py 코드 변경 → main.sh의 `update --sync-bridge` (동시 재시작)
+   - wrapper 템플릿 변경 → main.sh의 `update <agent>` (model 플래그 주면 재생성 안 됨, wrapper는 기본 재생성 플래그 별도 필요 — 현재는 수동 또는 `delete` + `create` 재설치)
    - env 파일 변경 → `agent_env_set` 사용, 전체 재작성 금지
+   - **중요**: `omo-bridge`는 문서용 별칭, 실제 CLI가 아님. 모든 호출은 `bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh <subcommand>` 형식으로.
 
 5. **OS-agnostic:**
    - macOS + Ubuntu 24.04 양쪽에서 동작해야 함

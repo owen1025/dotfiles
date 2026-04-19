@@ -75,17 +75,25 @@ ${INFO_START}
 - 데몬 label: \`${oc_label}\`, \`${br_label}\`
 - 로그 경로: \`${log_dir}/\`
 
-**관리 명령** (Slack 관련 이슈 발생 시):
-- 상태 확인: \`omo-bridge list --name ${agent_name}\`
-- 재시작: \`omo-bridge restart ${agent_name}\`
-- 로그 확인: \`omo-bridge logs ${agent_name} --tail 30\`
-- 모델/프롬프트 업데이트: \`omo-bridge update ${agent_name} --model ... --role-file ...\`
-- 아이콘 변경: \`omo-bridge update ${agent_name} --icon <path>\`
+**관리 명령 호출 방법**:
+
+\`omo-bridge\`는 문서용 별칭입니다. 실제 실행은 main.sh를 직접 호출하세요:
+
+\`\`\`
+bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh <subcommand> [options]
+\`\`\`
+
+자주 쓰는 커맨드 (이 에이전트 기준):
+- 상태 확인: \`bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh list --name ${agent_name}\`
+- 재시작: \`bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh restart ${agent_name}\`
+- 로그 확인: \`bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh logs ${agent_name} --tail 30\`
+- 모델/프롬프트 업데이트: \`bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh update ${agent_name} --model ... --role-file ...\`
+- 아이콘 변경: \`bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh update ${agent_name} --icon <path>\`
 
 **프로젝트별 커스터마이징**:
 - \`opencode.json\` — 모델, 도구 권한, MCP 등 에이전트 런타임 설정
 - \`AGENTS.md\` — 에이전트 역할, 운영 원칙 (이 파일). 위 마커 섹션 외부는 자유롭게 작성
-- \`bridge/bridge.py\` — Slack ↔ OpenCode 브릿지 로직 (스킬 템플릿에서 파생). 커스터마이징 시 \`omo-bridge update --sync-bridge\`로 덮어쓰이지 않도록 주의
+- \`bridge/bridge.py\` — Slack ↔ OpenCode 브릿지 로직 (스킬 템플릿에서 파생). 커스터마이징 시 main.sh의 \`update --sync-bridge\`로 덮어쓰이지 않도록 주의
 ${INFO_END}
 EOF
 	)
