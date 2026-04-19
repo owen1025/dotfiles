@@ -39,19 +39,40 @@ BR_LABEL=$(echo "$entry" | jq -r '.daemon.bridge_label')
 PORT=$(echo "$entry" | jq -r '.port')
 LOG_DIR=$(echo "$entry" | jq -r '.log_dir')
 
-# Restart opencode (unless --only bridge)
+# Snapshot the PID currently serving the opencode port so we can prove the
+# restart actually replaced it. Without this the health check below would
+# happily pass against a stale/stuck process (historical bug — see
+# daemon_macos.sh restart_daemon header).
+OLD_PORT_PID=""
+if [[ -z "$ONLY" || "$ONLY" == "opencode" ]]; then
+	if command -v lsof >/dev/null 2>&1; then
+		OLD_PORT_PID=$(lsof -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)
+	fi
+fi
+
+RESTART_FAILED=0
+
 if [[ -z "$ONLY" || "$ONLY" == "opencode" ]]; then
 	echo "Restarting $OC_LABEL..."
-	restart_daemon "$OC_LABEL"
+	if ! restart_daemon "$OC_LABEL" "$PORT"; then
+		echo "ERROR: $OC_LABEL restart failed." >&2
+		if [[ -n "$OLD_PORT_PID" ]]; then
+			echo "Recovery: kill -9 $OLD_PORT_PID && launchctl kickstart -k gui/\$(id -u)/$OC_LABEL" >&2
+		fi
+		RESTART_FAILED=1
+	fi
 fi
 
-# Restart bridge (unless --only opencode)
 if [[ -z "$ONLY" || "$ONLY" == "bridge" ]]; then
 	echo "Restarting $BR_LABEL..."
-	restart_daemon "$BR_LABEL"
+	if ! restart_daemon "$BR_LABEL"; then
+		echo "ERROR: $BR_LABEL restart failed." >&2
+		RESTART_FAILED=1
+	fi
 fi
 
-# Health check
+((RESTART_FAILED)) && exit 1
+
 echo "Checking health..."
 local_ok=false
 for i in $(seq 1 10); do
@@ -61,8 +82,20 @@ for i in $(seq 1 10); do
 		break
 	fi
 done
+
+if [[ -z "$ONLY" || "$ONLY" == "opencode" ]]; then
+	if command -v lsof >/dev/null 2>&1; then
+		NEW_PORT_PID=$(lsof -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1 || true)
+		if [[ -n "$OLD_PORT_PID" && -n "$NEW_PORT_PID" && "$OLD_PORT_PID" == "$NEW_PORT_PID" ]]; then
+			echo "ERROR: port $PORT still held by old PID $OLD_PORT_PID — restart did not take effect." >&2
+			echo "Recovery: kill -9 $OLD_PORT_PID && launchctl kickstart -k gui/\$(id -u)/$OC_LABEL" >&2
+			exit 1
+		fi
+	fi
+fi
+
 $local_ok && echo "opencode: OK" || echo "WARN: opencode health check failed"
 
 echo "Status:"
-echo "  $OC_LABEL: $(status_daemon "$OC_LABEL")"
+echo "  $OC_LABEL: $(status_daemon "$OC_LABEL" "$PORT")"
 echo "  $BR_LABEL: $(status_daemon "$BR_LABEL")"
