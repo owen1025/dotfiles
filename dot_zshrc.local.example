@@ -11,6 +11,9 @@ export SLACK_MCP_XOXD_TOKEN=""
 export NTFY_TOPIC=""
 export PLAYWRIGHT_MCP_EXTENSION_TOKEN=""
 
+# === Google AI (Gemini models for OpenCode agents) ===
+export GOOGLE_GENERATIVE_AI_API_KEY=""
+
 # === GitHub (reuse gh CLI OAuth token for MCP/opencode) ===
 # Requires: gh auth login (one-time)
 export GITHUB_TOKEN="$(gh auth token 2>/dev/null)"
