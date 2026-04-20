@@ -11,6 +11,10 @@ export SLACK_MCP_XOXD_TOKEN=""
 export NTFY_TOPIC=""
 export PLAYWRIGHT_MCP_EXTENSION_TOKEN=""
 
+# === GitHub (reuse gh CLI OAuth token for MCP/opencode) ===
+# Requires: gh auth login (one-time)
+export GITHUB_TOKEN="$(gh auth token 2>/dev/null)"
+
 # === Slack Bot Factory (auto-managed by slack-bot-factory skill) ===
 # Format: SLACK_{WORKSPACE}_{BOT}_{APP_TOKEN|BOT_TOKEN}
 # Example:
