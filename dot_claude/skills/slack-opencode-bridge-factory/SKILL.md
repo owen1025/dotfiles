@@ -140,11 +140,34 @@ Removes daemons, env vars, registry entry. Preserves Slack App and project by de
   {agent}-bridge.sh
 ```
 
+## Scheduled Tasks
+
+Each agent can register recurring/one-shot prompts via the built-in `scheduler` MCP:
+
+- User says "매일 오후 5시 캘린더 정리해줘" in Slack
+- Agent parses the natural-language request, asks where to deliver results (DM vs channel)
+- Agent calls `schedule_register` MCP tool → stored in `~/.config/opencode-bridges/<agent>-schedules.db`
+- Bridge polls DB every 30s; APScheduler (tz=Asia/Seoul) fires the job at the right time
+- On fire: bridge creates a fresh OpenCode session, sends the stored prompt, posts the response to the chosen Slack target
+
+**MCP tools available to the agent:**
+- `schedule_register` — create recurring (cron) / interval / one-shot (date) schedule
+- `schedule_list` — list all schedules for this agent
+- `schedule_delete` — permanently remove
+- `schedule_pause` / `schedule_resume` — disable/re-enable
+
+**Persistence**: SQLite with WAL mode, per-agent isolation. Survives bridge restarts. MCP server (in OpenCode process) writes, bridge process reads — no lock contention.
+
+**Timezone**: Fixed Asia/Seoul by default. Override with `SCHEDULE_TIMEZONE` env var on the bridge daemon.
+
+**Bootstrap requirement for existing agents**: Bots created before scheduler support need `update <agent> --resync-bridge` (or manual: reinstall deps + add `mcp.scheduler` block to `opencode.json`). New `create` invocations include the scheduler automatically.
+
 ## Limitations (V1)
 - macOS only (launchd). Linux/systemd: V2
 - Single workspace per invocation (default: noanswer)
 - Browser steps required for token acquisition (Slack API limitation)
 - Remote (SSH) installation: V2
+- Scheduler latency up to 30s (DB polling interval). Minute-granularity triggers are reliable; second-granularity is not.
 
 **Profile image**:
 - Requires `users:write` scope (added by default in v4+)

@@ -92,8 +92,13 @@ zshrc_local_unset "$APP_TOKEN_ENV"
 # 5. Remove from factory state
 factory_remove_bot_from_state "$WORKSPACE" "$AGENT_NAME" 2>/dev/null || echo "WARN: Could not remove from factory state"
 
-# 6. Remove registry entry
 registry_delete "$AGENT_NAME"
+
+SCHEDULE_DB="$HOME/.config/opencode-bridges/$AGENT_NAME-schedules.db"
+if [[ -f "$SCHEDULE_DB" ]]; then
+	/bin/rm -f "$SCHEDULE_DB" "$SCHEDULE_DB-wal" "$SCHEDULE_DB-shm" || true
+	echo "Schedule DB removed: $SCHEDULE_DB"
+fi
 
 # 7. Optional: purge project
 if $PURGE_PROJECT; then

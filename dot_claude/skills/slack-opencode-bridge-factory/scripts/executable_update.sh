@@ -172,22 +172,38 @@ sync_bridge_all() {
 	local -a updated_agents=()
 	local -a failed_agents=()
 	TMPL_BRIDGE="$SKILL_DIR/templates/bridge"
+	source "$SKILL_DIR/scripts/lib/opencode_json.sh"
+	local bridge_files=(bridge.py session_store.py schedule_store.py scheduler_runtime.py scheduler_mcp.py requirements.txt)
 	for agent in "${valid_agents[@]}"; do
 		entry=$(registry_get "$agent")
 		proj=$(echo "$entry" | jq -r '.project_dir')
+		model=$(echo "$entry" | jq -r '.model')
 
 		/bin/cp "$proj/bridge/bridge.py" "$proj/bridge/bridge.py.bak.$(date +%s)" 2>/dev/null || true
 
-		if /bin/cp "$TMPL_BRIDGE/bridge.py" "$proj/bridge/bridge.py.new" &&
-			/bin/cp "$TMPL_BRIDGE/session_store.py" "$proj/bridge/session_store.py.new" &&
-			/bin/cp "$TMPL_BRIDGE/requirements.txt" "$proj/bridge/requirements.txt.new"; then
-			mv "$proj/bridge/bridge.py.new" "$proj/bridge/bridge.py"
-			mv "$proj/bridge/session_store.py.new" "$proj/bridge/session_store.py"
-			mv "$proj/bridge/requirements.txt.new" "$proj/bridge/requirements.txt"
+		local copy_ok=true
+		for f in "${bridge_files[@]}"; do
+			if ! /bin/cp "$TMPL_BRIDGE/$f" "$proj/bridge/$f.new" 2>/dev/null; then
+				copy_ok=false
+				break
+			fi
+		done
+
+		if $copy_ok; then
+			for f in "${bridge_files[@]}"; do
+				mv "$proj/bridge/$f.new" "$proj/bridge/$f"
+			done
 
 			if "$proj/bridge/.venv/bin/pip" install -q -r "$proj/bridge/requirements.txt" 2>/dev/null; then
-				echo "UPDATED: $agent"
-				updated_agents+=("$agent")
+				python_bin="$proj/bridge/.venv/bin/python"
+				if merge_opencode_config "$proj/opencode.json" "$model" \
+					"$agent" "$python_bin" "$proj" "$HOME" 2>/dev/null; then
+					echo "UPDATED: $agent"
+					updated_agents+=("$agent")
+				else
+					echo "WARN: $agent — opencode.json merge failed (bridge updated, scheduler MCP not registered)"
+					updated_agents+=("$agent")
+				fi
 			else
 				echo "FAIL: $agent — pip install failed"
 				failed_agents+=("$agent")
@@ -195,6 +211,9 @@ sync_bridge_all() {
 		else
 			echo "FAIL: $agent — file copy failed"
 			failed_agents+=("$agent")
+			for f in "${bridge_files[@]}"; do
+				/bin/rm -f "$proj/bridge/$f.new" 2>/dev/null || true
+			done
 		fi
 	done
 

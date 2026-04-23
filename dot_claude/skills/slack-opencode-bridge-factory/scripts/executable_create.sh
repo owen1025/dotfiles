@@ -387,15 +387,7 @@ cmd_create() {
 	fi
 	local model_to_use="${MODEL:-anthropic/claude-sonnet-4-5}"
 
-	# opencode.json (merge if exists, create if not)
 	source "$SKILL_DIR/scripts/lib/opencode_json.sh"
-	if [[ -f "$PROJECT_DIR/opencode.json" ]]; then
-		/bin/cp "$PROJECT_DIR/opencode.json" "$PROJECT_DIR/opencode.json.pre-bridge.bak"
-		rollback_register rm_file "$PROJECT_DIR/opencode.json.pre-bridge.bak"
-	else
-		rollback_register rm_file "$PROJECT_DIR/opencode.json"
-	fi
-	merge_opencode_config "$PROJECT_DIR/opencode.json" "$model_to_use" || die "opencode.json merge failed"
 
 	# AGENTS.md
 	if [[ "$ROLE_FILE" == "__KEEP_EXISTING__" ]]; then
@@ -422,10 +414,12 @@ cmd_create() {
 	fi
 	rollback_register rm_file "$PROJECT_DIR/AGENTS.md"
 
-	# bridge/ directory
 	mkdir -p "$PROJECT_DIR/bridge"
 	/bin/cp "$TMPL_DIR/bridge/bridge.py" "$PROJECT_DIR/bridge/bridge.py"
 	/bin/cp "$TMPL_DIR/bridge/session_store.py" "$PROJECT_DIR/bridge/session_store.py"
+	/bin/cp "$TMPL_DIR/bridge/schedule_store.py" "$PROJECT_DIR/bridge/schedule_store.py"
+	/bin/cp "$TMPL_DIR/bridge/scheduler_runtime.py" "$PROJECT_DIR/bridge/scheduler_runtime.py"
+	/bin/cp "$TMPL_DIR/bridge/scheduler_mcp.py" "$PROJECT_DIR/bridge/scheduler_mcp.py"
 	/bin/cp "$TMPL_DIR/bridge/requirements.txt" "$PROJECT_DIR/bridge/requirements.txt"
 	rollback_register rm_dir "$PROJECT_DIR/bridge"
 
@@ -443,12 +437,20 @@ cmd_create() {
 	"$PROJECT_DIR/bridge/.venv/bin/pip" install -q -r "$PROJECT_DIR/bridge/requirements.txt" ||
 		die "Failed to install Python dependencies"
 
-	# 9. Env file + wrappers
 	local bot_token_env app_token_env log_dir python_bin
 	bot_token_env=$(derive_env_var_name "$WORKSPACE" "$AGENT_NAME" "BOT_TOKEN")
 	app_token_env=$(derive_env_var_name "$WORKSPACE" "$AGENT_NAME" "APP_TOKEN")
 	log_dir="$HOME/.local/log/opencode-bridges/$AGENT_NAME"
 	python_bin="$PROJECT_DIR/bridge/.venv/bin/python"
+
+	if [[ -f "$PROJECT_DIR/opencode.json" ]]; then
+		/bin/cp "$PROJECT_DIR/opencode.json" "$PROJECT_DIR/opencode.json.pre-bridge.bak"
+		rollback_register rm_file "$PROJECT_DIR/opencode.json.pre-bridge.bak"
+	else
+		rollback_register rm_file "$PROJECT_DIR/opencode.json"
+	fi
+	merge_opencode_config "$PROJECT_DIR/opencode.json" "$model_to_use" \
+		"$AGENT_NAME" "$python_bin" "$PROJECT_DIR" "$HOME" || die "opencode.json merge failed"
 
 	# env file
 	agent_env_write "$AGENT_NAME" \

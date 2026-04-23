@@ -1,2 +1,5 @@
 slack_bolt>=1.21.0
 requests>=2.31.0
+apscheduler>=3.10.4
+pytz>=2024.1
+mcp>=1.0.0

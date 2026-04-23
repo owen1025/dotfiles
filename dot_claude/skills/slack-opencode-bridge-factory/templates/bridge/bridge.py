@@ -24,6 +24,7 @@ from session_store import (
     increment_depth,
     reset_depth,
 )
+from scheduler_runtime import ScheduleRuntime
 
 # ── 설정 ──────────────────────────────────────────────
 OPENCODE_URL = os.environ.get("OPENCODE_URL", "http://localhost:4096")
@@ -232,6 +233,32 @@ def process_mention(
         say(text=f"처리 중 오류가 발생했습니다: {e}", thread_ts=thread_ts)
 
 
+def _run_scheduled_prompt(schedule: dict) -> None:
+    sid = schedule["id"]
+    prompt = schedule["prompt"]
+    description = schedule["description"]
+    target_type = schedule["target_type"]
+    target_id = schedule["target_id"]
+
+    log.info(f"Executing schedule {sid} ({description}) → {target_type}:{target_id}")
+
+    session_id = create_opencode_session()
+    send_prompt(session_id, prompt)
+    response = collect_response(session_id)
+
+    header = f"⏰ *예약 작업 실행* — {description}"
+    chunks = chunk_text(response)
+
+    try:
+        app.client.chat_postMessage(channel=target_id, text=header)
+        for i, chunk in enumerate(chunks):
+            app.client.chat_postMessage(channel=target_id, text=chunk)
+            log.info(f"Schedule {sid} posted chunk {i + 1}/{len(chunks)} to {target_id}")
+    except Exception as e:
+        log.error(f"Schedule {sid} Slack post failed: {e}")
+        raise
+
+
 @app.event("app_mention")
 def handle_mention(event, say):
     user_id = event.get("user", "")
@@ -351,6 +378,13 @@ if __name__ == "__main__":
     log.info(f"Allowed users: {ALLOWED_USERS or '(all — SLACK_OWNER_ID not set)'}")
     log.info(f"Depth limit: {AGENT_DEPTH_LIMIT}")
     log.info(f"Peer bot users: {ALLOWED_PEER_BOT_USERS or '(none)'}")
+
+    schedule_runtime = ScheduleRuntime(executor=_run_scheduled_prompt)
+    try:
+        schedule_runtime.start()
+        log.info("Scheduler started")
+    except Exception as e:
+        log.error(f"Scheduler failed to start (non-fatal): {e}", exc_info=True)
 
     handler = SocketModeHandler(app, SLACK_APP_TOKEN)
     handler.start()
