@@ -1,8 +1,21 @@
 #!/bin/sh
-# tmux-osc52-copy: Send data to clipboard via OSC 52 DCS passthrough.
-# Solves: tmux's built-in set-clipboard fails to emit OSC 52 to mosh clients.
-# Workaround: emit OSC 52 wrapped in DCS passthrough to the pane's TTY,
-# which tmux strips and forwards to the outer terminal (mosh → Ghostty).
+# tmux-osc52-copy: Send data to clipboard via OSC 52 written directly
+# to the active tmux client's outer TTY (mosh-compatible, no tmux passthrough).
+#
+# Why not pane_tty + DCS passthrough?
+#   tmux strips the DCS wrap and forwards the inner OSC 52 to ITS controlling
+#   terminal — which for a mosh session is the mosh-server's internal pty,
+#   not the pty that mosh forwards to the client. Result: OSC 52 is
+#   consumed server-side and never reaches the client's outer terminal.
+#   Empirically reproduced on tmux 3.6a + mosh 1.4.0 + Ghostty.
+#   See: https://github.com/mobile-shell/mosh/pull/1104 (delbao comment, 2022)
+#
+# Why client_tty works:
+#   Each attached tmux client has its own slave pty (#{client_tty}) which
+#   is the *outer* terminal as tmux sees it. For a mosh client that pty is
+#   owned by the mosh-server process — writing OSC 52 there goes straight
+#   through UDP to the mosh-client and into Ghostty's clipboard. No tmux
+#   passthrough / DCS wrap needed. Works identically for local Ghostty.
 #
 # Data source:
 #   - If stdin is a pipe/redirect (non-TTY): read from stdin
@@ -12,20 +25,32 @@
 set -eu
 
 if [ ! -t 0 ]; then
-  # stdin is piped — use it
   raw=$(cat)
 else
-  # no stdin — fall back to tmux buffer (copy-mode usage)
-  raw=$(tmux save-buffer -)
+  raw=$(tmux save-buffer - 2>/dev/null || printf '')
 fi
 
+# mosh 1.4.0 requires 'c;' selection prefix; also accepted by Ghostty/xterm.
 buf=$(printf '%s' "$raw" | base64 | tr -d '\r\n')
-pane_tty=$(tmux display-message -p '#{pane_tty}')
 
-# DCS passthrough: \ePtmux;\e<inner-sequence>\e\\
-# Inner: \e]52;c;<base64>\a  (OSC 52, clipboard selection, BEL terminator)
-# mosh 1.4.0 strictly requires 'c;' selection prefix.
-printf '\033Ptmux;\033\033]52;c;%s\007\033\\' "$buf" > "$pane_tty"
+# Find the most-recently-active client attached to this pane's session.
+# #{client_activity} is a Unix timestamp — higher means more recent keyboard
+# activity, which reliably identifies the user's foreground session even
+# when multiple clients are attached (stale ssh, headless mosh-server, ...).
+session=$(tmux display-message -p '#{session_name}' 2>/dev/null || printf '')
+target_tty=''
+if [ -n "$session" ]; then
+  target_tty=$(tmux list-clients -t "$session" \
+    -F '#{client_activity} #{client_tty}' 2>/dev/null \
+    | sort -rn | head -n1 | awk '{print $2}')
+fi
 
-# Also set local macOS clipboard for direct (non-mosh) sessions
+# Write OSC 52 directly to the client's outer tty.
+# Ghostty receives it (clipboard-write = allow) and updates the macOS pasteboard.
+if [ -n "$target_tty" ] && [ -w "$target_tty" ]; then
+  printf '\033]52;c;%s\007' "$buf" > "$target_tty" 2>/dev/null || true
+fi
+
+# Also set local macOS clipboard for direct (non-mosh, non-ssh) tmux sessions.
+# No-op on Linux (pbcopy absent).
 command -v pbcopy >/dev/null 2>&1 && printf '%s' "$raw" | pbcopy 2>/dev/null || true

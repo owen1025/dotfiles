@@ -267,11 +267,12 @@ tmux_conf_theme_clock_style='24'
 # in copy mode, copying selection also copies to the OS clipboard
 #   - true
 #   - false (default)
-# Disabled on both OS — we handle clipboard via DCS passthrough (see below).
-# The gpakosz framework's copy-pipe 'pbcopy'/'xsel' only sets the SERVER-side
-# clipboard, and tmux's built-in set-clipboard fails to emit OSC 52 to mosh
-# clients (tmux 3.6a server consumes or mangles OSC 52 before mosh sees it).
-# DCS passthrough reliably forwards OSC 52 to the CLIENT terminal (Ghostty).
+# Disabled on both OS — we handle clipboard via a custom OSC 52 script that
+# writes directly to the active tmux client's outer TTY (see copy-mode-vi
+# bindings below). The gpakosz framework's copy-pipe 'pbcopy'/'xsel' only
+# sets the SERVER-side clipboard, and tmux's built-in set-clipboard fails to
+# reach mosh clients (tmux forwards OSC 52 to ITS own terminal, not to the
+# mosh-owned pty that actually reaches the client).
 tmux_conf_copy_to_os_clipboard=false
 
 # -- Plugins -------------------------------------------------------------------
@@ -287,21 +288,25 @@ set -g default-terminal "tmux-256color"
 set -as terminal-features ",tmux-256color:RGB"
 set -as terminal-overrides ",*:Tc"
 
-# Allow OSC passthrough so apps can query terminal background color (OSC 11)
-# This is critical for TUI apps (opencode, etc.) to detect Ghostty's theme
+# Allow OSC passthrough so apps can query terminal background color (OSC 11).
+# Critical for TUI apps (opencode, etc.) to detect Ghostty's theme.
+# NOTE: does NOT help OSC 52 over mosh — see clipboard section below.
 set -g allow-passthrough on
 
-# OSC 52 clipboard via DCS passthrough (mosh-compatible on macOS & Linux)
+# OSC 52 clipboard via direct-write to client TTY (mosh-compatible, both OS)
 #
-# Problem: tmux 3.6 built-in set-clipboard emits OSC 52 but mosh clients
-# never receive it — the tmux server consumes/mangles the sequence before
-# mosh can forward it to the client terminal. Affects both OS identically.
-# Solution: emit OSC 52 wrapped in DCS passthrough (\ePtmux;\e...\e\\) via
-# the pane TTY. tmux strips the DCS wrap and forwards the inner OSC 52 to
-# the outer terminal (mosh → client Ghostty → system clipboard).
-# The tmux-osc52-copy script handles this (see copy-mode-vi bindings below).
+# Problem: tmux 3.6a's built-in set-clipboard emits OSC 52 but mosh clients
+# never receive it — tmux writes OSC 52 to its own controlling terminal,
+# which (inside a mosh session) is the mosh-server's internal pty, not the
+# outer pty that mosh forwards to the client. DCS passthrough via pane_tty
+# has the same failure mode. Empirically confirmed on tmux 3.6a + mosh 1.4.0.
+# Cross-reference: https://github.com/mobile-shell/mosh/pull/1104 (delbao 2022).
+#
+# Solution: the tmux-osc52-copy script writes OSC 52 directly to the most-
+# recently-active client's #{client_tty}. For a mosh session that pty IS the
+# one mosh forwards to the client Ghostty — OSC 52 reaches the outer terminal
+# cleanly. Works identically for local (non-mosh) tmux sessions.
 set -s set-clipboard off
-set -g allow-passthrough all
 
 # Clean stale env vars from previous terminal (iTerm2 remnants in tmux server)
 set-environment -g -u ITERM_PROFILE
@@ -402,11 +407,12 @@ bind-key -n M-j if-shell "$is_vim" 'send-keys M-j'  'select-pane -D'
 bind-key -n M-k if-shell "$is_vim" 'send-keys M-k'  'select-pane -U'
 bind-key -n M-l if-shell "$is_vim" 'send-keys M-l'  'select-pane -R'
 
-# OSC 52 clipboard via DCS passthrough (mosh-compatible, both macOS & Linux)
-# Override copy-mode bindings to use tmux-osc52-copy script.
-# The script emits OSC 52 wrapped in DCS passthrough to the pane TTY,
-# which tmux forwards to the outer terminal (mosh → client Ghostty → clipboard).
-# Also calls pbcopy for local macOS sessions as fallback (no-op on Linux).
+# OSC 52 clipboard via direct client-TTY write (mosh-compatible, both OS)
+# Override copy-mode bindings to use the tmux-osc52-copy script, which
+# writes raw OSC 52 directly to the most-recently-active client's #{client_tty}.
+# This bypasses tmux's broken-over-mosh built-in set-clipboard and also the
+# pane_tty DCS-passthrough dead-end (see clipboard section earlier in this file).
+# Also calls pbcopy for local macOS sessions as a fallback (no-op on Linux).
 bind -T copy-mode-vi y send-keys -X copy-selection-and-cancel \; run-shell -b 'tmux-osc52-copy'
 bind -T copy-mode-vi Enter send-keys -X copy-selection-and-cancel \; run-shell -b 'tmux-osc52-copy'
 bind -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection-and-cancel \; run-shell -b 'tmux-osc52-copy'
