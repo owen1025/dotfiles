@@ -121,6 +121,51 @@
         "mcp-server-gcp"
       ],
       "enabled": true
+    },
+    "sequential-thinking": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "enabled": true
+    },
+    "fetch": {
+      "type": "local",
+      "command": [
+        "uvx",
+        "mcp-server-fetch"
+      ],
+      "enabled": true
+    },
+    "git": {
+      "type": "local",
+      "command": [
+        "uvx",
+        "mcp-server-git"
+      ],
+      "enabled": true
+    },
+    "time": {
+      "type": "local",
+      "command": [
+        "uvx",
+        "mcp-server-time",
+        "--local-timezone",
+        "Asia/Seoul"
+      ],
+      "enabled": true
+    },
+    "depwire": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "depwire-cli",
+        "mcp"
+      ],
+      "enabled": true
     }
   },
   "provider": {
