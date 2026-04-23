@@ -18,6 +18,25 @@ clone_if_missing() {
 	git clone "$url" "$dir"
 }
 
+# sparse_clone_subset DIR URL PATH [PATH...]
+# Clones only the requested subdirectories from URL into DIR via git sparse-checkout.
+# Use for monorepos / mega-skill-catalogs where we only want a few skills.
+sparse_clone_subset() {
+	local dir="$1" url="$2"
+	shift 2
+	local paths=("$@")
+
+	if [ -d "$dir" ]; then
+		echo "[skip] $(basename "$dir") already exists"
+		return 0
+	fi
+	echo "[sparse-clone] $url → ${paths[*]}"
+	git clone --filter=blob:none --no-checkout --depth=1 "$url" "$dir"
+	git -C "$dir" sparse-checkout init --cone
+	git -C "$dir" sparse-checkout set "${paths[@]}"
+	git -C "$dir" checkout
+}
+
 clone_if_missing "$OPENCODE_SKILLS/trailofbits" \
 	"https://github.com/trailofbits/skills.git"
 
@@ -31,6 +50,20 @@ clone_if_missing "$OPENCODE_SKILLS/ccpm" \
 # Non-fatal: skip silently on machines without the key.
 clone_if_missing "$OPENCODE_SKILLS/poker-tournament-trainer" \
 	"git@github.com-personal:owen1025/training.git" 2>/dev/null || true
+
+# Selective skills from ComposioHQ/awesome-claude-skills (monorepo).
+# Only pull the 2 skills we use; skip the other ~30 dirs.
+sparse_clone_subset "$OPENCODE_SKILLS/composio-skills" \
+	"https://github.com/ComposioHQ/awesome-claude-skills.git" \
+	"mcp-builder" "skill-creator"
+
+# Selective skills from sickn33/antigravity-awesome-skills (1400+ skills).
+# Only pull the specific skills we use; sparse-checkout keeps the dir small.
+sparse_clone_subset "$OPENCODE_SKILLS/antigravity-skills" \
+	"https://github.com/sickn33/antigravity-awesome-skills.git" \
+	"skills/bash-linux" \
+	"skills/analyze-project" \
+	"skills/autonomous-agent-patterns"
 
 # ---------------------------------------------------------------------------
 # 2. npx skills add (idempotent — skips already-installed skills)

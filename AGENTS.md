@@ -294,7 +294,31 @@ chezmoi init --apply --promptString email=you@example.com \
 
 이 dotfiles repo는 OMC(Claude Code) + OMO(OpenCode) 양쪽에서 공유하는 일부 스킬도 관리한다.
 
-### `slack-opencode-bridge-factory`
+### 외부 스킬 설치 (`run_once_install-opencode-skills.sh`)
+
+외부 스킬은 세 가지 방식으로 설치:
+
+1. **전체 리포 clone** (`clone_if_missing`) — 리포 전체가 스킬 모음인 경우
+   - `trailofbits/skills`, `obra/superpowers`, `automazeio/ccpm`
+
+2. **Sparse-checkout** (`sparse_clone_subset`) — 모노레포에서 몇 개만 선별
+   - `ComposioHQ/awesome-claude-skills` → `mcp-builder`, `skill-creator`
+   - `sickn33/antigravity-awesome-skills` → `bash-linux`, `analyze-project`, `autonomous-agent-patterns`
+   - 1400+ 스킬 중 일부만 pull → 디스크 절약 (~5MB)
+   - 주의: 리포 내 symlink가 sparse-checkout 범위 밖을 가리키면 dangling link 발생 (무해)
+
+3. **`npx skills add`** (글로벌) — skills.sh 생태계
+   - `phuryn/pm-skills`, `pchalasani/claude-code-tools`, `vercel-labs/agent-skills`, `vercel-labs/skills`
+
+**새 외부 스킬 추가 시:**
+- 리포 전체 쓰면 `clone_if_missing` 한 줄
+- 일부만 쓰면 `sparse_clone_subset` 한 줄 (paths 인자에 서브디렉토리 추가)
+- `npx skills add` 지원하면 npx 블록에 한 줄
+- 스크립트 수정 → chezmoi apply → 다른 머신에서 `chezmoi update`로 자동 반영
+
+### 공유 스킬 (OMC ↔ OMO)
+
+#### `slack-opencode-bridge-factory`
 
 **위치:**
 - Master: `dot_claude/skills/slack-opencode-bridge-factory/` (chezmoi 관리)
