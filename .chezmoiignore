@@ -9,6 +9,8 @@ Brewfile.lock.json
 *.example
 node_modules/
 sessions/
+docs/
+docs
 
 # oh-my-openagent.json: user-managed by upstream omo CLI; do not sync via dotfiles
 .config/opencode/oh-my-openagent.json
