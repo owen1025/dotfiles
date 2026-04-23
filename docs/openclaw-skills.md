@@ -4,26 +4,26 @@
 
 ## 설치되는 스킬 (cross-OS, 9개)
 
-| 스킬 | 바이너리 | 설치 명령 | 환경변수 |
+| 스킬 | 의존성 바이너리 | 자동 설치 방식 | 환경변수 |
 |---|---|---|---|
-| steipete/markdown-converter | `uvx` | 이미 brew로 uv 설치됨 | (없음) |
-| steipete/gog | `gog` | `brew install steipete/tap/gogcli` | `GOG_ACCOUNT` (옵션) |
-| steipete/1password | `op` | `brew install 1password-cli` (Brewfile에 이미 있음) | `OP_ACCOUNT` (옵션, 다중 계정 시) |
+| steipete/markdown-converter | `uvx` | Brewfile `uv` | (없음) |
+| steipete/gog | `gog` | Brewfile `steipete/tap/gogcli` | `GOG_ACCOUNT` (옵션) |
+| steipete/1password | `op` | Brewfile `1password-cli` (macOS only) | `OP_ACCOUNT` (옵션, 다중 계정 시) |
 | arnarsson/git-essentials | `git` | 이미 있음 | (없음) |
-| jk-0001/automation-workflows | (없음) | 순수 방법론 문서 | (없음) |
-| oyi77/data-analyst | `python3` + pandas/matplotlib (사용 시) | `uv pip install pandas matplotlib` | 데이터 소스별 (DB 연결 문자열 등) |
-| shawnpana/browser-use | `browser-use` CLI + Chromium | `pipx install browser-use` 또는 `uv tool install browser-use` | `BROWSER_USE_API_KEY` (cloud mode 시) |
-| whiteknight07/exa-web-search-free | `mcporter` CLI | `npm i -g mcporter` (또는 `npx mcporter`) | (없음 — Exa free tier) |
-| udiedrichsen/stock-analysis | `uv` | 이미 있음 | `AUTH_TOKEN`, `CT0` (Twitter/X 연동 선택 시) |
+| jk-0001/automation-workflows | (없음) | 문서 | (없음) |
+| oyi77/data-analyst | `python3` + pandas/matplotlib (사용 시) | 수동 `uv pip install` | 데이터 소스별 (DB 연결 문자열 등) |
+| shawnpana/browser-use | `browser-use` + Chromium | uv-tool-packages.txt | `BROWSER_USE_API_KEY` (cloud mode 시) |
+| whiteknight07/exa-web-search-free | `mcporter` | npm-global-packages.txt | (없음 — Exa free tier) |
+| udiedrichsen/stock-analysis | `uv` | Brewfile `uv` | `AUTH_TOKEN`, `CT0` (Twitter/X 연동 시) |
 
 ## 설치되는 스킬 (macOS 전용, 2개)
 
-darwin 브랜치에서 자동으로 sparse-checkout에 추가됨:
+`run_once_install-opencode-skills.sh`의 darwin 블록에서 sparse-checkout에 자동 추가:
 
-| 스킬 | 바이너리 | 설치 명령 | 권한 |
+| 스킬 | 바이너리 | 자동 설치 방식 | 권한 |
 |---|---|---|---|
-| steipete/apple-notes | `memo` | `brew tap antoniorodr/memo && brew install antoniorodr/memo/memo` | Notes.app Automation 권한 (최초 실행 시 프롬프트) |
-| steipete/apple-reminders | `remindctl` | `brew install steipete/tap/remindctl` | Reminders.app 권한 (`remindctl authorize`) |
+| steipete/apple-notes | `memo` | Brewfile `antoniorodr/memo/memo` | Notes.app Automation 권한 (최초 실행 시 프롬프트) |
+| steipete/apple-reminders | `remindctl` | Brewfile `steipete/tap/remindctl` | Reminders.app 권한 (`remindctl authorize`) |
 
 ## `~/.zshrc.local`에 추가할 환경변수 템플릿
 
@@ -46,61 +46,47 @@ export GOG_ACCOUNT="owen@example.com"
 # export CT0="xxxxx"
 ```
 
-## 최초 셋업 (머신당 1회)
+## 자동 설치 (chezmoi apply)
+
+다음은 dotfiles가 자동으로 설치함:
+
+- **Brewfile.tmpl (cross-OS)**: `uv`, `steipete/tap/gogcli`
+- **Brewfile.tmpl (darwin block)**: `1password-cli`, `antoniorodr/memo/memo`, `steipete/tap/remindctl`
+- **npm-global-packages.txt**: `mcporter`
+- **uv-tool-packages.txt**: `browser-use --python 3.13` (Python 3.14 비호환으로 3.13 고정)
+- **run_once_install-opencode-skills.sh**: openclaw/skills sparse-checkout 9개 (+ darwin에서 2개)
+
+## 최초 1회 수동 셋업 (머신별 인증/권한)
 
 ### 공통 (cross-OS)
 
 ```bash
-# 1) CLI 설치 (Brewfile에 없는 것만)
-brew install steipete/tap/gogcli            # gog (Google Workspace)
-npm install -g mcporter                     # whiteknight07/exa-web-search-free
-uv tool install browser-use                 # shawnpana/browser-use
-#   └ 또는: pipx install browser-use
-browser-use doctor                          # 설치 검증
+# browser-use 검증 + profile-use 컴포넌트 설치
+browser-use doctor
+browser-use profile update
 
-# 2) gog OAuth 1회 셋업
-#    - Google Cloud Console에서 Desktop OAuth client 생성 → client_secret.json 다운로드
+# gog OAuth 1회 셋업
+#   Google Cloud Console → Desktop OAuth client 생성 → client_secret.json 다운로드
 gog auth credentials ~/Downloads/client_secret.json
 gog auth add owen@example.com --services gmail,calendar,drive,contacts,sheets,docs
 gog auth list
 
-# 3) 1Password 로그인 (지원되는 경우)
-op signin
-
-# 4) Exa MCP 등록
-mcporter config add exa https://mcp.exa.ai/mcp
+# Exa MCP 등록 (home scope = 글로벌, ~/.mcporter/mcporter.json에 저장)
+mcporter config add exa https://mcp.exa.ai/mcp --scope home
 ```
 
 ### macOS 전용
 
 ```bash
-# Apple Notes CLI
-brew tap antoniorodr/memo
-brew install antoniorodr/memo/memo
-memo notes                  # 최초 실행 → Notes.app Automation 권한 요청 프롬프트 수락
-
-# Apple Reminders CLI
-brew install steipete/tap/remindctl
-remindctl authorize         # 권한 요청
-remindctl status            # 권한 확인
+op signin                    # 1Password CLI 로그인
+memo notes                   # 최초 실행 → Notes.app Automation 권한 프롬프트 수락
+remindctl authorize          # Reminders.app 권한 요청
+remindctl status             # 확인
 ```
 
-## Brewfile 업데이트 권장사항
+### Linux 전용
 
-이 스킬들이 Brewfile.tmpl에 추가되면 `chezmoi apply`가 자동으로 설치:
-
-```ruby
-# Cross-OS
-brew "steipete/tap/gogcli"    # Google Workspace CLI (linuxbrew도 지원)
-
-{{ if eq .chezmoi.os "darwin" -}}
-# macOS 전용
-brew "antoniorodr/memo/memo"
-brew "steipete/tap/remindctl"
-{{- end }}
-```
-
-`mcporter`와 `browser-use`는 npm/pipx 기반이라 Brewfile에 안 넣고 위 수동 설치 or `npm-global-packages.txt`에 추가 가능.
+`1password-cli`는 Linuxbrew 미지원. 필요 시 [공식 apt repo](https://developer.1password.com/docs/cli/get-started/#install) 수동 설치.
 
 ## 업데이트 (다른 머신에서 반영)
 

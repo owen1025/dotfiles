@@ -1,0 +1,6 @@
+# uv tool packages
+# Install: `uv tool install <pkg>` via run_onchange_04-uv-tools.sh
+# Dump:    uv tool list | awk '{print $1}' | grep -v '^-'
+#
+# Format: one package per line. Optionally pin Python: `browser-use --python 3.13`
+browser-use --python 3.13

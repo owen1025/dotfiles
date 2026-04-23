@@ -5,6 +5,7 @@
 @plannotator/opencode
 carbonyl
 clawdbot
+mcporter
 oh-my-claude-sisyphus
 openclaw
 typescript-language-server
