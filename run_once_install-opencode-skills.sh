@@ -46,6 +46,30 @@ clone_if_missing "$OPENCODE_SKILLS/superpowers" \
 clone_if_missing "$OPENCODE_SKILLS/ccpm" \
 	"https://github.com/automazeio/ccpm"
 
+# openclaw/skills monorepo (clawskills.sh). Curated subset. See docs/openclaw-skills.md for deps+env vars.
+sparse_clone_subset "$OPENCODE_SKILLS/openclaw" \
+	"https://github.com/openclaw/skills.git" \
+	"skills/steipete/markdown-converter" \
+	"skills/steipete/gog" \
+	"skills/steipete/1password" \
+	"skills/arnarsson/git-essentials" \
+	"skills/jk-0001/automation-workflows" \
+	"skills/oyi77/data-analyst" \
+	"skills/shawnpana/browser-use" \
+	"skills/whiteknight07/exa-web-search-free" \
+	"skills/udiedrichsen/stock-analysis"
+
+case "$(uname -s)" in
+Darwin)
+	if [ -d "$OPENCODE_SKILLS/openclaw" ]; then
+		echo "[sparse-update] openclaw → +macOS-only skills"
+		git -C "$OPENCODE_SKILLS/openclaw" sparse-checkout add \
+			"skills/steipete/apple-notes" \
+			"skills/steipete/apple-reminders" 2>/dev/null || true
+	fi
+	;;
+esac
+
 # Private repo — requires SSH key (github.com-personal host alias).
 # Non-fatal: skip silently on machines without the key.
 clone_if_missing "$OPENCODE_SKILLS/poker-tournament-trainer" \
