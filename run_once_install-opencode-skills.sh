@@ -95,16 +95,16 @@ sparse_clone_subset "$OPENCODE_SKILLS/antigravity-skills" \
 # ---------------------------------------------------------------------------
 if command -v npx &>/dev/null; then
 	# PM Skills — 65 product management skills (phuryn/pm-skills)
-	npx -y skills add phuryn/pm-skills -g -y 2>/dev/null || true
+	npx -y skills add phuryn/pm-skills -g --agent opencode -y 2>/dev/null || true
 
-	# Claude Code Tools — aichat, tmux-cli, workflow (pchalasani/claude-code-tools)
-	npx -y skills add pchalasani/claude-code-tools -g -y 2>/dev/null || true
+	# skills.sh tool bundle — aichat, tmux-cli, workflow (pchalasani/claude-code-tools)
+	npx -y skills add pchalasani/claude-code-tools -g --agent opencode -y 2>/dev/null || true
 
 	# Vercel agent skills — react, composition patterns, web design, react native
-	npx -y skills add vercel-labs/agent-skills -g -y 2>/dev/null || true
+	npx -y skills add vercel-labs/agent-skills -g --agent opencode -y 2>/dev/null || true
 
 	# Vercel skills — find-skills
-	npx -y skills add vercel-labs/skills -g -y 2>/dev/null || true
+	npx -y skills add vercel-labs/skills -g --agent opencode -y 2>/dev/null || true
 else
 	echo "WARN: npx not found. Skipping npx-managed skills." >&2
 fi
@@ -113,6 +113,4 @@ fi
 # 3. Notes
 # ---------------------------------------------------------------------------
 # - dev-browser: installed automatically by oh-my-openagent plugin. No action needed.
-# - english-conversation-trainer, vpn-manager: chezmoi-managed custom skills
-#   (synced as dot_config/opencode/skills/*/SKILL.md).
 # - progress.md files inside skill dirs are machine-specific and NOT synced.
