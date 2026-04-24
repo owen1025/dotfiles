@@ -156,6 +156,32 @@
         "mcp"
       ],
       "enabled": true
+    },
+    "mcp-registry": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@mcpfinder/server"
+      ],
+      "enabled": true
+    },
+    "pulsemcp": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "pulsemcp-server"
+      ],
+      "enabled": true
+    },
+    "glama": {
+      "type": "local",
+      "command": [
+        "uvx",
+        "mcp-glama-registry"
+      ],
+      "enabled": true
     }
   },
   "provider": {

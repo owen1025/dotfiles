@@ -90,6 +90,32 @@ sparse_clone_subset "$OPENCODE_SKILLS/antigravity-skills" \
 	"skills/autonomous-agent-patterns"
 
 # ---------------------------------------------------------------------------
+# Discovery-pipeline sources (scanned by mcp-skill-discovery polling daemon)
+# These awesome-lists are cloned for markdown parsing + skill reference.
+# See AGENTS.md "Discovery Pipeline Sources" section.
+# ---------------------------------------------------------------------------
+
+# anthropics/skills — Official Anthropic Claude Skills (PDF/DOCX/PPTX/XLSX/etc.)
+clone_if_missing "$OPENCODE_SKILLS/anthropic-official" \
+	"https://github.com/anthropics/skills.git"
+
+# VoltAgent/awesome-agent-skills — 1000+ curated official skills (Stripe, Cloudflare, Sentry, Figma, etc.). No-slop policy.
+clone_if_missing "$OPENCODE_SKILLS/voltagent-awesome" \
+	"https://github.com/VoltAgent/awesome-agent-skills.git"
+
+# hesreallyhim/awesome-claude-code — 40K+ stars, skills + hooks + slash-commands + orchestrators
+clone_if_missing "$OPENCODE_SKILLS/awesome-claude-code" \
+	"https://github.com/hesreallyhim/awesome-claude-code.git"
+
+# travisvn/awesome-claude-skills — 11K+ stars, practical skills directory
+clone_if_missing "$OPENCODE_SKILLS/awesome-claude-skills" \
+	"https://github.com/travisvn/awesome-claude-skills.git"
+
+# skills.sh — queried at runtime via `npx skills find <query>`. No clone needed.
+# The add-skill CLI (already ensured via `npx` presence check above) resolves
+# packages from GitHub/GitLab/npm when discovery pipeline proposes installs.
+
+# ---------------------------------------------------------------------------
 # 2. npx skills add (idempotent — skips already-installed skills)
 #    Requires: node/npm (installed via brew bundle)
 # ---------------------------------------------------------------------------

@@ -307,6 +307,24 @@ chezmoi init --apply --promptString email=you@example.com \
    - 1400+ 스킬 중 일부만 pull → 디스크 절약 (~5MB)
    - 주의: 리포 내 symlink가 sparse-checkout 범위 밖을 가리키면 dangling link 발생 (무해)
 
+### Discovery Pipeline Sources (MCP + Skill 자동 발견용)
+
+봇이 새 MCP/Skill을 Slack으로 알려주고 승인 시 자동 설치하는 파이프라인의 데이터 소스:
+
+**MCP 레지스트리 (opencode.json.tmpl MCP 등록):**
+- `mcp-registry` (`@mcpfinder/server`) — Official MCP Registry + MCPfinder 다중 소스 검색
+- `pulsemcp` (`pulsemcp-server`) — PulseMCP sub-registry (Official 포함 + 인기 메트릭)
+- `glama` (`mcp-glama-registry` via uvx) — Glama directory (21K+ 서버)
+
+**Skill 소스 (`run_once_install-opencode-skills.sh` 신규 clone 4개):**
+- `anthropic-official` ← `anthropics/skills` (공식 Anthropic 스킬 — PDF/DOCX 등)
+- `voltagent-awesome` ← `VoltAgent/awesome-agent-skills` (1000+ 큐레이션, No-slop)
+- `awesome-claude-code` ← `hesreallyhim/awesome-claude-code` (40K stars, 통합 리스트)
+- `awesome-claude-skills` ← `travisvn/awesome-claude-skills` (11K stars, 실용 모음)
+- `skills.sh` — 런타임에 `npx skills find` 으로 쿼리 (clone 없음)
+
+탐색 데몬은 각 소스의 최신 변경을 diff하여 신규 후보를 Slack 승인 채널로 푸시.
+
 3. **`npx skills add`** (글로벌) — skills.sh 생태계
    - `phuryn/pm-skills`, `pchalasani/claude-code-tools`, `vercel-labs/agent-skills`, `vercel-labs/skills`
 
