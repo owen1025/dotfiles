@@ -165,7 +165,15 @@ restart_daemon() {
 		fi
 	fi
 
-	# Phase 4: verify a distinct new PID is alive.
+	# Phase 4: kickstart the bootstrapped service. On macOS, bootstrap may load
+	# the job without immediately spawning it even when RunAtLoad is present;
+	# kickstart turns the load into an explicit demand start before PID polling.
+	if ! launchctl kickstart -k "gui/$uid/$label" >/dev/null 2>&1; then
+		echo "ERROR: kickstart failed for $label after bootstrap" >&2
+		return 1
+	fi
+
+	# Phase 5: verify a distinct new PID is alive.
 	local tries=0 new_pid=""
 	while ((tries < 25)); do
 		new_pid=$(_pid_for_label "$label")
@@ -182,7 +190,7 @@ restart_daemon() {
 		return 1
 	fi
 
-	# Phase 5: if port supplied, verify the new PID (or one of its children)
+	# Phase 6: if port supplied, verify the new PID (or one of its children)
 	# actually binds the port within 10s. This catches the case where launchd
 	# respawned but opencode itself crash-looped without ever binding.
 	if [[ -n "$port" ]]; then

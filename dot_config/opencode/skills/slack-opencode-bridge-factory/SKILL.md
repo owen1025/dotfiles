@@ -33,7 +33,7 @@ Do NOT activate for:
 
 1. `jq` installed (`which jq`)
 2. `opencode` installed and configured
-3. `slack-bot-factory` skill installed (`~/.claude/skills/omc-learned/slack-bot-factory/`)
+3. `slack-bot-factory` skill installed (`~/.config/opencode/skills/slack-bot-factory/`)
 4. Slack workspace bootstrapped in slack-bot-factory
 
 ## Create Flow (2 Phases)
@@ -64,9 +64,9 @@ Phase 2 (automated):
 > **중요**: `omo-bridge`는 이 문서에서 사용하는 **별칭**일 뿐, 실제 CLI가 아닙니다.
 > 실제 실행은 항상 다음 경로로:
 > ```
-> bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh <subcommand> [options]
+> bash ~/.config/opencode/skills/slack-opencode-bridge-factory/scripts/main.sh <subcommand> [options]
 > ```
-> 예: `omo-bridge restart secretary` → `bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh restart secretary`
+> 예: `omo-bridge restart secretary` → `bash ~/.config/opencode/skills/slack-opencode-bridge-factory/scripts/main.sh restart secretary`
 
 ### create
 ```bash
@@ -124,8 +124,7 @@ Removes daemons, env vars, registry entry. Preserves Slack App and project by de
 ## File Structure
 
 ```
-~/.claude/skills/slack-opencode-bridge-factory/    ← chezmoi managed
-~/.config/opencode/skills/slack-opencode-bridge-factory  ← OMO symlink
+~/.config/opencode/skills/slack-opencode-bridge-factory/    ← chezmoi managed
 
 ~/.config/opencode-bridges/
   registry.json           ← single source of truth for all agents
@@ -179,7 +178,7 @@ Each agent can register recurring/one-shot prompts via the built-in `scheduler` 
 - Chosen over text "처리 중..." message to avoid cross-bot confusion in multi-agent threads
 
 ## Dependencies
-- `slack-bot-factory` skill (`~/.claude/skills/omc-learned/slack-bot-factory/`)
+- `slack-bot-factory` skill (`~/.config/opencode/skills/slack-bot-factory/`)
 - `jq` (JSON processing)
 - `opencode` 1.4+
 - `python3` 3.10+ (for bridge venv)

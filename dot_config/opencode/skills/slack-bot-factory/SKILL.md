@@ -61,7 +61,7 @@ Tell user exactly this:
 3. Workspace 드롭다운에서 해당 workspace 선택 → "Generate Token"
 4. 두 토큰이 나옵니다. 아래 셸에서 실행:
 
-   ~/.claude/skills/omc-learned/slack-bot-factory/scripts/bootstrap-workspace.sh <slug>
+   ~/.config/opencode/skills/slack-bot-factory/scripts/bootstrap-workspace.sh <slug>
 
 5. 프롬프트에 두 토큰 붙여넣기
 ```
@@ -107,14 +107,14 @@ Confirm the final scope list with the user BEFORE proceeding.
 
 Run (absolute path):
 ```bash
-~/.claude/skills/omc-learned/slack-bot-factory/scripts/create-bot.sh \
+~/.config/opencode/skills/slack-bot-factory/scripts/create-bot.sh \
   <workspace> <bot-name> <display-name> <socket-mode:true|false> \
   <bot-scopes-csv> <bot-events-csv>
 ```
 
 Example:
 ```bash
-~/.claude/skills/omc-learned/slack-bot-factory/scripts/create-bot.sh \
+~/.config/opencode/skills/slack-bot-factory/scripts/create-bot.sh \
   noanswer secretary "Secretary" true \
   "app_mentions:read,chat:write,channels:history,channels:read" \
   "app_mention"
@@ -163,19 +163,19 @@ If Socket Mode=false, skip step [1/2].
 
 Once user provides the tokens, run:
 ```bash
-~/.claude/skills/omc-learned/slack-bot-factory/scripts/finalize-bot.sh \
+~/.config/opencode/skills/slack-bot-factory/scripts/finalize-bot.sh \
   <workspace> <bot-name> <xapp-token-or-"none"> <xoxb-token> <channel-csv>
 ```
 
 Example (Socket Mode):
 ```bash
-~/.claude/skills/omc-learned/slack-bot-factory/scripts/finalize-bot.sh \
+~/.config/opencode/skills/slack-bot-factory/scripts/finalize-bot.sh \
   noanswer secretary "xapp-1-ABC..." "xoxb-XYZ..." "#dev,#general"
 ```
 
 Example (no Socket Mode):
 ```bash
-~/.claude/skills/omc-learned/slack-bot-factory/scripts/finalize-bot.sh \
+~/.config/opencode/skills/slack-bot-factory/scripts/finalize-bot.sh \
   noanswer notifier none "xoxb-XYZ..." "#alerts"
 ```
 

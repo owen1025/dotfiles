@@ -315,7 +315,7 @@ fi
 # -- token rotation --
 if $ROTATE_TOKENS; then
 	echo "Rotating workspace config token for: $WORKSPACE"
-	FACTORY_COMMON="${HOME}/.claude/skills/omc-learned/slack-bot-factory/lib/common.sh"
+	FACTORY_COMMON="${HOME}/.config/opencode/skills/slack-bot-factory/lib/common.sh"
 	if [[ ! -f "$FACTORY_COMMON" ]]; then
 		echo "ERROR: slack-bot-factory not found at $FACTORY_COMMON" >&2
 		exit 1

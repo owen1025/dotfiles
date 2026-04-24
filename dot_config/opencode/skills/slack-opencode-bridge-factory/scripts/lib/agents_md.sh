@@ -80,15 +80,15 @@ ${INFO_START}
 \`omo-bridge\`는 문서용 별칭입니다. 실제 실행은 main.sh를 직접 호출하세요:
 
 \`\`\`
-bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh <subcommand> [options]
+bash ~/.config/opencode/skills/slack-opencode-bridge-factory/scripts/main.sh <subcommand> [options]
 \`\`\`
 
 자주 쓰는 커맨드 (이 에이전트 기준):
-- 상태 확인: \`bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh list --name ${agent_name}\`
-- 재시작: \`bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh restart ${agent_name}\`
-- 로그 확인: \`bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh logs ${agent_name} --tail 30\`
-- 모델/프롬프트 업데이트: \`bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh update ${agent_name} --model ... --role-file ...\`
-- 아이콘 변경: \`bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh update ${agent_name} --icon <path>\`
+- 상태 확인: \`bash ~/.config/opencode/skills/slack-opencode-bridge-factory/scripts/main.sh list --name ${agent_name}\`
+- 재시작: \`bash ~/.config/opencode/skills/slack-opencode-bridge-factory/scripts/main.sh restart ${agent_name}\`
+- 로그 확인: \`bash ~/.config/opencode/skills/slack-opencode-bridge-factory/scripts/main.sh logs ${agent_name} --tail 30\`
+- 모델/프롬프트 업데이트: \`bash ~/.config/opencode/skills/slack-opencode-bridge-factory/scripts/main.sh update ${agent_name} --model ... --role-file ...\`
+- 아이콘 변경: \`bash ~/.config/opencode/skills/slack-opencode-bridge-factory/scripts/main.sh update ${agent_name} --icon <path>\`
 
 **프로젝트별 커스터마이징**:
 - \`opencode.json\` — 모델, 도구 권한, MCP 등 에이전트 런타임 설정

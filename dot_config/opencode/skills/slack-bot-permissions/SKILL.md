@@ -52,7 +52,7 @@ Verify:
 
 **List current scopes**:
 ```bash
-~/.claude/skills/omc-learned/slack-bot-permissions/scripts/list-scopes.sh <workspace> <bot-name>
+~/.config/opencode/skills/slack-bot-permissions/scripts/list-scopes.sh <workspace> <bot-name>
 ```
 
 Fetches fresh manifest from Slack (via `apps.manifest.export`) and displays:
@@ -62,7 +62,7 @@ Fetches fresh manifest from Slack (via `apps.manifest.export`) and displays:
 
 **Add/remove scopes**:
 ```bash
-~/.claude/skills/omc-learned/slack-bot-permissions/scripts/update-scopes.sh \
+~/.config/opencode/skills/slack-bot-permissions/scripts/update-scopes.sh \
   <workspace> <bot-name> <op> <scopes-csv> [events-csv]
 ```
 

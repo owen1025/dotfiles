@@ -2,7 +2,7 @@
 # Wrapper around slack-bot-factory scripts.
 # Source this file; do NOT execute directly.
 
-FACTORY_DIR="${HOME}/.claude/skills/omc-learned/slack-bot-factory"
+FACTORY_DIR="${HOME}/.config/opencode/skills/slack-bot-factory"
 FACTORY_COMMON="${FACTORY_DIR}/lib/common.sh"
 FACTORY_CREATE="${FACTORY_DIR}/scripts/create-bot.sh"
 FACTORY_FINALIZE="${FACTORY_DIR}/scripts/finalize-bot.sh"
