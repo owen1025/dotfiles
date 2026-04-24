@@ -6,9 +6,7 @@
 opencode-ai
 dev-browser
 carbonyl
-clawdbot
 mcporter
-oh-my-claude-sisyphus
 openclaw
 typescript-language-server
 typescript

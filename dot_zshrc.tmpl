@@ -291,8 +291,6 @@ compdef kubecolor=kubectl
 alias cz="chezmoi"
 alias czd="chezmoi diff --exclude=scripts"
 
-# claude
-alias ch="claude -p" # headless
 
 # github
 alias grl="gh repo list --limit 100 --json nameWithOwner -q '.[].nameWithOwner' | fzf | xargs gh repo clone"
@@ -321,19 +319,11 @@ if [[ -S "{{ .chezmoi.homeDir }}/.local/share/tailscale/tailscaled.sock" ]]; the
   alias tailscale="tailscale --socket={{ .chezmoi.homeDir }}/.local/share/tailscale/tailscaled.sock"
 fi
 
-# Claude Code OTEL Telemetry (devops-bot usage tracking)
-export CLAUDE_CODE_ENABLE_TELEMETRY=1
-export OTEL_METRICS_ENABLED=true
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-export OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative
-export OTEL_METRICS_INCLUDE_SESSION_ID=false
-export OTEL_RESOURCE_ATTRIBUTES="team=devops,user={{ .email }}"
 
 # OpenClaw Completion
 [ -f "{{ .chezmoi.homeDir }}/.openclaw/completions/openclaw.zsh" ] && source "{{ .chezmoi.homeDir }}/.openclaw/completions/openclaw.zsh"
 
-# ####################### OpenCode/Claude Code Utilities #######################
+# ####################### OpenCode Utilities #######################
 
 # Send notification via ntfy.sh
 ntfy() {
