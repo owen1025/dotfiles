@@ -3,6 +3,7 @@
 # Dump:    npm list -g --depth=0 --parseable | tail -n +2 | xargs -I {} basename {}
 @mermaid-js/mermaid-cli
 @plannotator/opencode
+dev-browser
 carbonyl
 clawdbot
 mcporter
