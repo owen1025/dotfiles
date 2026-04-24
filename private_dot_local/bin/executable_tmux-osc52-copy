@@ -18,17 +18,29 @@
 #   passthrough / DCS wrap needed. Works identically for local Ghostty.
 #
 # Data source:
-#   - If stdin is a pipe/redirect (non-TTY): read from stdin
-#     → enables `cat file | pbcopy`, `echo foo | pbcopy`, etc.
-#   - Otherwise: read from tmux buffer
+#   - If stdin is a pipe/redirect with actual data: read from stdin
+#     → enables `cat file | tmux-osc52-copy`, `echo foo | tmux-osc52-copy`, etc.
+#   - Otherwise (empty stdin, tty, or `run-shell -b`): read from tmux buffer
 #     → preserves tmux copy-mode binding (run-shell -b 'tmux-osc52-copy')
+#
+# IMPORTANT: `tmux run-shell -b` spawns the subprocess with stdin = non-TTY
+# AND empty (not a real pipe). So `[ ! -t 0 ]` alone cannot distinguish
+# "real pipe with data" from "run-shell empty stdin" — we must also check
+# whether `cat` returned anything, and fall through to `save-buffer` if not.
+# Without this fallthrough, the keybinding path emits an EMPTY OSC 52,
+# which clobbers the clipboard with "". Confirmed on tmux 3.6a.
 set -eu
 
+raw=''
 if [ ! -t 0 ]; then
   raw=$(cat)
-else
+fi
+if [ -z "$raw" ]; then
   raw=$(tmux save-buffer - 2>/dev/null || printf '')
 fi
+
+# Nothing to copy — abort without clobbering the clipboard.
+[ -n "$raw" ] || exit 0
 
 # mosh 1.4.0 requires 'c;' selection prefix; also accepted by Ghostty/xterm.
 buf=$(printf '%s' "$raw" | base64 | tr -d '\r\n')
