@@ -29,11 +29,10 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply owen1025
   ├── dot_p10k.zsh                ← powerlevel10k 프롬프트 (plain copy)
   ├── dot_tmux.conf               ← tmux 설정 (gpakosz/.tmux fork)
   ├── dot_tmux.conf.local         ← tmux 로컬 오버라이드
-  ├── dot_claude/                 ← Claude Code 설정 (.mcp.json, settings.json, .omc-config.json)
   ├── dot_config/
   │   ├── nvim/                   ← neovim (init.vim → sources .vimrc, coc-settings.json)
-  │   ├── opencode/               ← OpenCode CLI 설정 (opencode.json, oh-my-openagent.json 등)
-  │   │   └── skills/             ← 커스텀 skill (english-conversation-trainer, vpn-manager)
+  │   ├── opencode/               ← OpenCode CLI 설정 (opencode.json, plugins, MCP, skills)
+  │   │   └── skills/             ← 관리 skill (Slack bridge/factory)
   │   └── k9s/                    ← k9s 쿠버네티스 UI (config, hotkey, skin, views)
   ├── private_Library/            ← Ghostty 터미널 설정
   ├── private_dot_ssh/                    ← SSH 설정 (config.tmpl — macOS 1Password IdentityAgent 분기)
@@ -42,7 +41,7 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply owen1025
   ├── run_before_*.sh             ← 부트스트랩 (brew, oh-my-zsh, antigen, fzf, vim plugins, tmux, zsh-kubecolor)
   ├── run_before_-1-install-prerequisites.sh ← Linux prereq 체크 (apt 패키지 존재 확인)
   ├── run_onchange_*.sh.tmpl      ← 변경 감지 자동 실행 (brew bundle, npm install)
-  ├── run_once_*.sh               ← 1회 실행 (Claude Code 설치, zshrc.local 복사)
+  ├── run_once_*.sh               ← 1회 실행 (zshrc.local 복사, OpenCode skills, migration cleanup)
   ├── run_once_install-linux-zsh-default.sh  ← Linux only: /etc/shells 등록 + chsh 자동화
   ├── run_once_install-docker.sh             ← Linux only: Docker CE + compose plugin
   ├── run_once_install-ngrok.sh              ← Linux only: ngrok CLI
@@ -68,7 +67,7 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply owen1025
 - **1Password 사용 안 함** — 각 머신에서 `~/.zshrc.local` 수동 관리
 - `dot_zshrc.local.example` → 새 머신에서 `run_once_setup-zshrc-local.sh`가 자동 복사
 - `.zshrc.local`은 chezmoi managed 아님 (`.chezmoiignore`에 `*.example` 제외)
-- opencode.json, .mcp.json의 `${VAR}` 참조는 런타임 환경변수 확장 (템플릿화하지 않음)
+- opencode.json의 `${VAR}` 참조는 런타임 환경변수 확장 (템플릿화하지 않음)
 
 ### OS-specific 코드
 - chezmoi template: `{{ if eq .chezmoi.os "darwin" }}` / `{{ if eq .chezmoi.os "linux" }}`
@@ -292,7 +291,7 @@ chezmoi init --apply --promptString email=you@example.com \
 
 ## Managed Skills
 
-이 dotfiles repo는 OMC(Claude Code) + OMO(OpenCode) 양쪽에서 공유하는 일부 스킬도 관리한다.
+이 dotfiles repo는 OpenCode를 단일 agent runtime으로 사용한다. MCP와 skill의 canonical source는 `dot_config/opencode/`이다.
 
 ### 외부 스킬 설치 (`run_once_install-opencode-skills.sh`)
 
@@ -302,6 +301,7 @@ chezmoi init --apply --promptString email=you@example.com \
    - `trailofbits/skills`, `obra/superpowers`, `automazeio/ccpm`
 
 2. **Sparse-checkout** (`sparse_clone_subset`) — 모노레포에서 몇 개만 선별
+   - `openclaw/skills` → curated subset (`docs/openclaw-skills.md` 참고)
    - `ComposioHQ/awesome-claude-skills` → `mcp-builder`, `skill-creator`
    - `sickn33/antigravity-awesome-skills` → `bash-linux`, `analyze-project`, `autonomous-agent-patterns`
    - 1400+ 스킬 중 일부만 pull → 디스크 절약 (~5MB)
@@ -316,26 +316,26 @@ chezmoi init --apply --promptString email=you@example.com \
 - `npx skills add` 지원하면 npx 블록에 한 줄
 - 스크립트 수정 → chezmoi apply → 다른 머신에서 `chezmoi update`로 자동 반영
 
-### 공유 스킬 (OMC ↔ OMO)
+### OpenCode 관리 스킬
 
-#### `slack-opencode-bridge-factory`
+#### Slack bot/bridge skills
 
 **위치:**
-- Master: `dot_claude/skills/slack-opencode-bridge-factory/` (chezmoi 관리)
-- OMO 심볼릭 링크: `~/.config/opencode/skills/slack-opencode-bridge-factory` → master
-  - 생성 자동화: `run_once_setup-omo-skills-symlinks.sh`
+- `dot_config/opencode/skills/slack-opencode-bridge-factory/`
+- `dot_config/opencode/skills/slack-bot-factory/`
+- `dot_config/opencode/skills/slack-bot-permissions/`
 
-**역할:** OpenCode 에이전트를 Slack 봇으로 브릿지 (Socket Mode + launchd/systemd)
+**역할:** OpenCode 에이전트를 Slack 봇으로 브릿지하고, Slack App 생성/권한 관리를 자동화한다.
 
 **서브커맨드:** `create`, `finalize`, `list`, `restart`, `logs`, `update`, `delete`, `migrate`, `refresh-peers`
 
 **디렉토리 구조:**
 ```
-dot_claude/skills/slack-opencode-bridge-factory/
+dot_config/opencode/skills/slack-opencode-bridge-factory/
 ├── SKILL.md                            # skill 엔트리 + triggers
 ├── scripts/
-│   ├── main.sh                         # 서브커맨드 라우터
-│   ├── create.sh, finalize.sh, ...     # 각 커맨드
+│   ├── main.sh                         # 서브커맨드 라우터 (chezmoi target)
+│   ├── create.sh, finalize.sh, ...     # 각 커맨드 (chezmoi target)
 │   └── lib/
 │       ├── detect_os.sh                # OS 감지 + brew_bin_path (macOS/Linux)
 │       ├── daemon.sh → daemon_macos.sh OR daemon_linux.sh
@@ -353,7 +353,7 @@ dot_claude/skills/slack-opencode-bridge-factory/
     ├── slack_manifest.json.tmpl        # Slack App manifest (scopes 포함)
     ├── env_file.tmpl                   # 에이전트별 env
     ├── launchd_{opencode,bridge}.plist.tmpl     # macOS 데몬
-    ├── systemd_{opencode,bridge}.service.tmpl   # Linux 데몬 (V2)
+    ├── systemd_{opencode,bridge}.service.tmpl   # Linux 데몬
     └── wrapper_{opencode,bridge}.sh.tmpl        # launchd/systemd exec 타겟
 ```
 
@@ -365,7 +365,7 @@ dot_claude/skills/slack-opencode-bridge-factory/
 - `~/.local/log/opencode-bridges/{agent}/{opencode,bridge}.log`
 
 **의존성:**
-- `dot_claude/skills/omc-learned/slack-bot-factory/` — Slack App 생성 (Manifest API) 위임
+- `dot_config/opencode/skills/slack-bot-factory/` — Slack App 생성 (Manifest API) 위임
 - `~/.zshrc.local`에 `SLACK_{WORKSPACE}_{AGENT}_{BOT,APP}_TOKEN` 환경변수
 - `opencode.json`의 MCP (playwright, slack 등 — 글로벌 `dot_config/opencode/opencode.json.tmpl`에서 관리)
 
@@ -377,9 +377,8 @@ dot_claude/skills/slack-opencode-bridge-factory/
 
 1. **commit은 반드시 dotfiles에서:**
    ```bash
-   chezmoi add ~/.claude/skills/slack-opencode-bridge-factory
    cd ~/Desktop/owen/dotfiles
-   git add dot_claude/skills/slack-opencode-bridge-factory
+   git add dot_config/opencode/skills/slack-opencode-bridge-factory      dot_config/opencode/skills/slack-bot-factory      dot_config/opencode/skills/slack-bot-permissions
    git commit -m "..." && git push
    ```
    스킬 디렉토리 내부에서 `git init`/`git commit` 하면 chezmoi가 `.git` 포함해버림.
@@ -390,9 +389,9 @@ dot_claude/skills/slack-opencode-bridge-factory/
 
 4. **스킬 변경 후 기존 에이전트 반영:**
    - bridge.py 코드 변경 → main.sh의 `update --sync-bridge` (동시 재시작)
-   - wrapper 템플릿 변경 → main.sh의 `update <agent>` (model 플래그 주면 재생성 안 됨, wrapper는 기본 재생성 플래그 별도 필요 — 현재는 수동 또는 `delete` + `create` 재설치)
+   - wrapper 템플릿 변경 → main.sh의 `update <agent>` 또는 `delete` + `create` 재설치
    - env 파일 변경 → `agent_env_set` 사용, 전체 재작성 금지
-   - **중요**: `omo-bridge`는 문서용 별칭, 실제 CLI가 아님. 모든 호출은 `bash ~/.claude/skills/slack-opencode-bridge-factory/scripts/main.sh <subcommand>` 형식으로.
+   - 모든 호출은 `bash ~/.config/opencode/skills/slack-opencode-bridge-factory/scripts/main.sh <subcommand>` 형식으로.
 
 5. **OS-agnostic:**
    - macOS + Ubuntu 24.04 양쪽에서 동작해야 함
@@ -402,6 +401,5 @@ dot_claude/skills/slack-opencode-bridge-factory/
 
 ### 새 관리 대상 스킬 추가 시
 
-1. `dot_claude/skills/<skill-name>/` 작성 (chezmoi 자동 관리)
-2. OMO에도 심볼릭 링크 필요하면 `run_once_setup-omo-skills-symlinks.sh`의 `SHARED_SKILLS` 배열에 추가
-3. AGENTS.md의 "Managed Skills" 섹션에 항목 추가 (이 섹션)
+1. `dot_config/opencode/skills/<skill-name>/` 작성 (chezmoi 자동 관리)
+2. AGENTS.md의 "Managed Skills" 섹션에 항목 추가 (이 섹션)
