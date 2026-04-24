@@ -29,9 +29,9 @@ if command -v npx >/dev/null 2>&1; then
   npx -y skills remove -g --agent claude-code --skill '*' -y >/dev/null 2>&1 || true
 fi
 
-# Remove now-unused Claude Code globals if npm is available. Non-fatal for machines without npm.
+# Remove OMC globals if npm is available. Non-fatal for machines without npm.
 if command -v npm >/dev/null 2>&1; then
-  npm uninstall -g @anthropic-ai/claude-code oh-my-claude-sisyphus clawdbot >/dev/null 2>&1 || true
+  npm uninstall -g oh-my-claude-sisyphus clawdbot >/dev/null 2>&1 || true
 fi
 
 echo "OpenCode-only migration cleanup complete."
