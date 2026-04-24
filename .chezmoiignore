@@ -19,5 +19,4 @@ docs
 Library/**
 Documents/EdgeMark/**
 {{- end }}
-
-
+.claude/**

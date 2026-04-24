@@ -1,6 +1,6 @@
 {{- $email := promptStringOnce . "email" "Git email address" -}}
 {{- $name := promptStringOnce . "name" "Git full name" -}}
-{{- $useAnthropicAuth := promptBoolOnce . "useAnthropicAuth" "Use @ex-machina/opencode-anthropic-auth plugin" -}}
+{{- $useAnthropicAuth := promptBoolOnce . "useAnthropicAuth" "Use Anthropic auth plugin for OpenCode (not Claude Code CLI)" -}}
 
 [data]
     email = {{ $email | quote }}
