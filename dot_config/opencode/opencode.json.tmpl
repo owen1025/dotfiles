@@ -31,13 +31,11 @@
       "command": [
         "npx",
         "-y",
-        "slack-mcp-server",
-        "--transport",
-        "stdio"
+        "@zencoderai/slack-mcp-server"
       ],
       "environment": {
-        "SLACK_MCP_XOXC_TOKEN": "${SLACK_MCP_XOXC_TOKEN}",
-        "SLACK_MCP_XOXD_TOKEN": "${SLACK_MCP_XOXD_TOKEN}"
+        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+        "SLACK_TEAM_ID": "${SLACK_TEAM_ID}"
       },
       "enabled": true
     },
@@ -85,12 +83,16 @@
     "github": {
       "type": "local",
       "command": [
-        "npx",
-        "-y",
-        "@ldraney/github-mcp"
+        "docker",
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
       ],
       "environment": {
-        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
       },
       "enabled": true
     },

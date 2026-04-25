@@ -1,25 +1,86 @@
-# Machine-specific environment variables (secrets only)
-# Copy this file to ~/.zshrc.local and fill in your values:
+# ============================================================================
+# ~/.zshrc.local — Machine-specific environment variables (secrets only)
+# ============================================================================
+# This file is NOT managed by chezmoi. Each machine keeps its own copy.
+# Setup:
 #   cp ~/.zshrc.local.example ~/.zshrc.local
+#   chmod 600 ~/.zshrc.local
+#   # then edit and fill in real values
+# ============================================================================
 
-# === Credentials ===
+
+# ----------------------------------------------------------------------------
+# GitHub  —  reused by `gh` CLI AND github-mcp-server (Docker)
+# ----------------------------------------------------------------------------
+# Requires `gh auth login` once. Token is auto-pulled and exported.
+# Used by:
+#   - gh CLI (native)
+#   - opencode github MCP (mapped to GITHUB_PERSONAL_ACCESS_TOKEN)
+export GITHUB_TOKEN="$(gh auth token 2>/dev/null)"
+
+
+# ----------------------------------------------------------------------------
+# Slack  —  central MCP for opencode (zencoderai/slack-mcp-server)
+# ----------------------------------------------------------------------------
+# Setup:
+#   1. Create Slack app:  https://api.slack.com/apps  →  "From scratch"
+#   2. OAuth & Permissions → add Bot Token Scopes:
+#        channels:history, channels:read, chat:write,
+#        reactions:write, users:read, users.profile:read
+#   3. "Install to Workspace" → copy "Bot User OAuth Token" (xoxb-...)
+#   4. Team ID:  https://slack.com/help/articles/221769328  (starts with T)
+#   5. /invite the bot to channels you want it to read
+#
+# Tip: to reuse a slack-bot-factory bot, just alias it:
+#   export SLACK_BOT_TOKEN="$SLACK_NOANSWER_SECRETARY_BOT_TOKEN"
+export SLACK_BOT_TOKEN=""             # xoxb-...
+export SLACK_TEAM_ID=""               # T0123ABCDEF
+
+
+# ----------------------------------------------------------------------------
+# Slack Bot Factory  —  auto-managed by slack-bot-factory skill
+# ----------------------------------------------------------------------------
+# Format:  SLACK_{WORKSPACE}_{BOT}_{APP_TOKEN|BOT_TOKEN}
+# Tokens are APPENDED automatically when you run the skill — do not edit by hand.
+# Example (after running the skill):
+#   export SLACK_NOANSWER_SECRETARY_APP_TOKEN="xapp-..."
+#   export SLACK_NOANSWER_SECRETARY_BOT_TOKEN="xoxb-..."
+
+
+# ----------------------------------------------------------------------------
+# Notion  —  notion-mcp-server
+# ----------------------------------------------------------------------------
+# Get integration token:  https://www.notion.so/my-integrations
 export NOTION_API_KEY=""
 export NOTION_TOKEN=""
-export LINEAR_API_TOKEN=""
-export SLACK_MCP_XOXC_TOKEN=""
-export SLACK_MCP_XOXD_TOKEN=""
-export NTFY_TOPIC=""
 
-# === Google AI (Gemini models for OpenCode agents) ===
+
+# ----------------------------------------------------------------------------
+# Linear  —  mcp-linear
+# ----------------------------------------------------------------------------
+# Get personal API key:  https://linear.app/settings/api
+export LINEAR_API_TOKEN=""
+
+
+# ----------------------------------------------------------------------------
+# Google Drive  —  gdrive MCP (OAuth client credentials)
+# ----------------------------------------------------------------------------
+# Create OAuth client:  https://console.cloud.google.com/apis/credentials
+# Type: Desktop app. Token cache lives in ~/.config/gdrive-mcp/
+export GDRIVE_CLIENT_ID=""
+export GDRIVE_CLIENT_SECRET=""
+
+
+# ----------------------------------------------------------------------------
+# Google AI  —  Gemini models for opencode agents
+# ----------------------------------------------------------------------------
+# Get key:  https://aistudio.google.com/app/apikey
 export GEMINI_API_KEY=""
 export GOOGLE_GENERATIVE_AI_API_KEY=""
 
-# === GitHub (reuse gh CLI OAuth token for MCP/opencode) ===
-# Requires: gh auth login (one-time)
-export GITHUB_TOKEN="$(gh auth token 2>/dev/null)"
 
-# === Slack Bot Factory (auto-managed by slack-bot-factory skill) ===
-# Format: SLACK_{WORKSPACE}_{BOT}_{APP_TOKEN|BOT_TOKEN}
-# Example:
-#   export SLACK_NOANSWER_SECRETARY_APP_TOKEN="xapp-..."
-#   export SLACK_NOANSWER_SECRETARY_BOT_TOKEN="xoxb-..."
+# ----------------------------------------------------------------------------
+# ntfy.sh  —  push notifications (opencode-ntfy.sh plugin)
+# ----------------------------------------------------------------------------
+# Subscribe to any topic:  https://ntfy.sh/<your-topic-name>
+export NTFY_TOPIC=""

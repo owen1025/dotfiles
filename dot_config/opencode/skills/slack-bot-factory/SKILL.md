@@ -28,7 +28,7 @@ Activate when the user asks to:
 Do NOT activate for:
 - Modifying existing bot permissions → use `slack-bot-permissions` skill instead
 - Debugging a running bot's code → that's separate
-- Setting up `slack-mcp-server` (uses session tokens, different flow)
+- Setting up the central `slack` MCP for opencode itself (uses `@zencoderai/slack-mcp-server` with a single Bot token — see `~/.zshrc.local`)
 
 ## Prerequisites
 
