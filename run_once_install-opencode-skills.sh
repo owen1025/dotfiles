@@ -136,7 +136,64 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Notes
+# 3. Flatten deeply-nested skills (depth ≥4 → 1-level symlinks)
+#    OpenCode's Skill MCP tool only registers paths at depth ≤3 from the
+#    skills root. Deeper SKILL.md files (e.g., trailofbits's 5-level
+#    `plugins/{plugin}/skills/{skill}/SKILL.md` and openclaw's 4-level
+#    `skills/{maintainer}/{skill}/SKILL.md`) appear in the system prompt's
+#    available_skills list but cannot be invoked via Skill(name=...).
+#    This step creates basename symlinks at depth 1 to make them callable.
+#    Tracked via .flatten-manifest.txt for idempotent cleanup on rerun.
+# ---------------------------------------------------------------------------
+remove_tracked_symlinks() {
+	local manifest="$1" skills_root="$2"
+	[ -f "$manifest" ] || return 0
+	while IFS= read -r name; do
+		[ -z "$name" ] && continue
+		[ -L "$skills_root/$name" ] && rm "$skills_root/$name"
+	done <"$manifest"
+	: >"$manifest"
+}
+
+flatten_deep_skills() {
+	local skills_root="$OPENCODE_SKILLS"
+	local manifest="$skills_root/.flatten-manifest.txt"
+
+	remove_tracked_symlinks "$manifest" "$skills_root"
+
+	# `find` without -L does NOT follow symlinks; this prevents infinite
+	# recursion through the depth-1 symlinks we are about to create.
+	find "$skills_root" -type f -name "SKILL.md" 2>/dev/null | while IFS= read -r skill_md; do
+		local skill_dir rel depth name target
+		skill_dir="${skill_md%/SKILL.md}"
+		rel="${skill_dir#"$skills_root/"}"
+		depth=$(echo "$rel" | tr '/' '\n' | wc -l | tr -d ' ')
+		[ "$depth" -lt 4 ] && continue
+
+		name=$(basename "$skill_dir")
+		target="$skills_root/$name"
+
+		if [ -e "$target" ] && [ ! -L "$target" ]; then
+			echo "[flatten skip] $name → conflict with existing dir/file" >&2
+			continue
+		fi
+
+		ln -sfn "$rel" "$target"
+		echo "$name" >>"$manifest"
+	done
+
+	if [ -f "$manifest" ]; then
+		local count
+		count=$(wc -l <"$manifest" | tr -d ' ')
+		echo "[flatten] $count deep skills symlinked at depth 1"
+	fi
+}
+
+flatten_deep_skills
+
+# ---------------------------------------------------------------------------
+# 4. Notes
 # ---------------------------------------------------------------------------
 # - dev-browser: installed automatically by oh-my-openagent plugin. No action needed.
 # - progress.md files inside skill dirs are machine-specific and NOT synced.
+# - .flatten-manifest.txt is per-machine state, NOT synced via chezmoi.

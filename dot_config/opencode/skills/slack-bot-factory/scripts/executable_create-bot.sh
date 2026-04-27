@@ -74,13 +74,12 @@ MANIFEST="$(
     oauth_config: {
       scopes: { bot: $scopes }
     },
-    settings: {
-      event_subscriptions: { bot_events: $events },
+    settings: ({
       interactivity: { is_enabled: false },
       org_deploy_enabled: false,
       socket_mode_enabled: $socket_mode,
       token_rotation_enabled: false
-    }
+    } + (if ($events | length) > 0 then { event_subscriptions: { bot_events: $events } } else {} end))
   }'
 )"
 
