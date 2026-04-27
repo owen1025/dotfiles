@@ -311,6 +311,14 @@ export PATH={{ .chezmoi.homeDir }}/.opencode/bin:$PATH
 # Load local machine-specific config (not committed to git)
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
+# Mirror GEMINI_API_KEY → GOOGLE_GENERATIVE_AI_API_KEY
+# opencode's @ai-sdk/google SDK only reads GOOGLE_GENERATIVE_AI_API_KEY,
+# not GEMINI_API_KEY (despite `opencode auth list` displaying it). Auto-mirror
+# so users only need to set GEMINI_API_KEY in ~/.zshrc.local.
+if [[ -n "$GEMINI_API_KEY" && -z "$GOOGLE_GENERATIVE_AI_API_KEY" ]]; then
+  export GOOGLE_GENERATIVE_AI_API_KEY="$GEMINI_API_KEY"
+fi
+
 # Tailscale
 alias ts="tailscale"
 
