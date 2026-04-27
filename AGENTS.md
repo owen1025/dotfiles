@@ -334,6 +334,44 @@ chezmoi init --apply --promptString email=you@example.com \
 - `npx skills add` 지원하면 npx 블록에 한 줄
 - 스크립트 수정 → chezmoi apply → 다른 머신에서 `chezmoi update`로 자동 반영
 
+### Skill 평탄화 (Flatten Deep Skills)
+
+**문제**: OpenCode의 Skill MCP tool은 `~/.config/opencode/skills/` 기준 **depth ≤3 까지만** path-based registry에 등록한다. 더 깊은 SKILL.md는 시스템 프롬프트의 `<available_skills>` 리스트에는 description으로 노출되지만 `Skill(name=...)` 호출 시 "not found" 에러로 실패한다 (그리고 `task(load_skills=[...])` 주입에도 실패할 가능성이 있음).
+
+**영향받는 스킬 (총 82개):**
+- `trailofbits/plugins/{plugin}/skills/{skill}` (5-level) — 72개 (semgrep, codeql, address-sanitizer, 모든 vulnerability scanner 등)
+- `openclaw/skills/{maintainer}/{skill}` (4-level) — 9개 (1password, gog, markdown-converter 등)
+- `trailofbits/.codex/skills/gh-cli` (4-level) — 1개
+
+**해결**: `run_once_install-opencode-skills.sh` 의 `flatten_deep_skills` 함수가 depth ≥4 SKILL.md 마다 depth-1 위치에 basename symlink 생성:
+
+```
+~/.config/opencode/skills/semgrep -> trailofbits/plugins/static-analysis/skills/semgrep
+~/.config/opencode/skills/1password -> openclaw/skills/steipete/1password
+```
+
+**메커니즘:**
+- 추적: `.flatten-manifest.txt` (생성된 symlink 이름 목록)
+- 재실행 시 manifest 기반 cleanup 후 재생성 (idempotent)
+- 충돌 (실제 디렉토리/파일과 같은 이름) 발생 시 skip + 경고
+- relative symlink 사용 → `$HOME` 경로 다른 머신에서도 동작
+
+**제약:**
+- Symlink 자체는 chezmoi managed 아님 (런타임 생성). install script 실행 시점에 새로 생성.
+- `.flatten-manifest.txt` 는 머신별 상태 — `.chezmoiignore` 에 명시 안 해도 source에 없으므로 git 추적 안 됨
+- basename 충돌 검사: 현재 82개 deep skill 모두 unique. 새 sparse_clone_subset 추가 시 **conflict check 필요** (script에서 자동 skip 하지만 의도된 skill을 놓칠 수 있음)
+- OpenCode session 재시작 후에야 새 symlink 인식. 단순히 chezmoi apply 후엔 즉시 안 잡힘
+
+**검증:**
+```bash
+# Symlink 개수 확인
+ls -la ~/.config/opencode/skills/ | grep -c '^l'  # → 82
+# Manifest 일치 확인
+wc -l ~/.config/opencode/skills/.flatten-manifest.txt  # → 82
+# 특정 skill 호출 가능한지 (OpenCode 재시작 후)
+# Skill(name="semgrep") → SKILL.md content 반환되어야 함
+```
+
 ### OpenCode 관리 스킬
 
 #### Slack bot/bridge skills
