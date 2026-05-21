@@ -416,3 +416,20 @@ bind-key -n M-l if-shell "$is_vim" 'send-keys M-l'  'select-pane -R'
 bind -T copy-mode-vi y send-keys -X copy-selection-and-cancel \; run-shell -b 'tmux-osc52-copy'
 bind -T copy-mode-vi Enter send-keys -X copy-selection-and-cancel \; run-shell -b 'tmux-osc52-copy'
 bind -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection-and-cancel \; run-shell -b 'tmux-osc52-copy'
+
+# OpenCode TUI compose popup (prefix + e)
+# Opens nvim in a centered popup (95% x 50%) for multi-line input composition,
+# then bracketed-pastes the result back to the originating pane on save+quit.
+# 50% height preserves visibility of the response area above the popup.
+# Note: overrides gpakosz/.tmux default `prefix+e` (which opened .tmux.conf.local
+# in $EDITOR) — that binding is unnecessary with the chezmoi-managed workflow.
+bind e run-shell ' \
+  TARGET="#{pane_id}"; \
+  TMPFILE=$(mktemp /tmp/oc-compose.XXXXXX).md; \
+  tmux display-popup -E -w 95% -h 50% "nvim -c \"set ft=markdown\" \"$TMPFILE\""; \
+  if [ -s "$TMPFILE" ]; then \
+    tmux load-buffer -b oc-compose "$TMPFILE"; \
+    tmux paste-buffer -p -b oc-compose -t "$TARGET"; \
+    tmux delete-buffer -b oc-compose 2>/dev/null; \
+  fi; \
+  rm -f "$TMPFILE"'
