@@ -371,6 +371,100 @@ alias ocn='opencode-notify'
 
 export RECALL_OPENCODE_CMD="opencode --resume {id}"
 
+# ── Anthropic auth toggle (OAuth ↔ API key) ──
+# OpenCode anthropic provider는 auth.json의 type 필드(oauth | api)로 분기됨.
+# 두 슬롯 파일을 미리 백업해두고 즉시 전환.
+#
+# 최초 설정 (한 번만):
+#   1) opencode auth login anthropic → "Claude Pro/Max" 선택 → oc-auth-init oauth
+#   2) opencode auth login anthropic → "Manually enter API Key" 선택 → oc-auth-init apikey
+#
+# 일상 사용:
+#   oc-auth-status     → 현재 어느 방식인지
+#   oc-oauth           → OAuth로 전환 (Pro/Max 구독 사용, 비용 0)
+#   oc-apikey          → API key로 전환 (long context 별도 credits 불필요)
+#   oc-oauth-restart   → OAuth로 전환 + 실행중인 opencode 종료
+#   oc-apikey-restart  → API key로 전환 + 실행중인 opencode 종료
+_OC_AUTH_FILE="$HOME/.local/share/opencode/auth.json"
+_OC_AUTH_OAUTH_SLOT="$HOME/.local/share/opencode/auth.oauth.json"
+_OC_AUTH_APIKEY_SLOT="$HOME/.local/share/opencode/auth.apikey.json"
+
+oc-auth-status() {
+  if [[ ! -f "$_OC_AUTH_FILE" ]]; then
+    echo "⚠️  No auth.json at $_OC_AUTH_FILE" >&2
+    return 1
+  fi
+  local atype
+  atype=$(jq -r '.anthropic.type // "none"' "$_OC_AUTH_FILE" 2>/dev/null)
+  case "$atype" in
+    oauth) echo "🔐 anthropic: OAuth (Pro/Max subscription)" ;;
+    api)   echo "🔑 anthropic: API key (pay-per-use)" ;;
+    none)  echo "⚠️  anthropic: not configured" ;;
+    *)     echo "❓ anthropic: unknown type ($atype)" ;;
+  esac
+  [[ -f "$_OC_AUTH_OAUTH_SLOT" ]]  && echo "   slot oauth : ✓" || echo "   slot oauth : ✗ (run: oc-auth-init oauth)"
+  [[ -f "$_OC_AUTH_APIKEY_SLOT" ]] && echo "   slot apikey: ✓" || echo "   slot apikey: ✗ (run: oc-auth-init apikey)"
+}
+
+oc-oauth() {
+  if [[ ! -f "$_OC_AUTH_OAUTH_SLOT" ]]; then
+    echo "❌ OAuth slot missing: $_OC_AUTH_OAUTH_SLOT" >&2
+    echo "   Run 'opencode auth login anthropic' (pick Claude Pro/Max), then 'oc-auth-init oauth'" >&2
+    return 1
+  fi
+  cp "$_OC_AUTH_OAUTH_SLOT" "$_OC_AUTH_FILE"
+  echo "✅ Switched to Claude Pro/Max OAuth"
+  echo "💡 Restart any running opencode session to apply"
+}
+
+oc-apikey() {
+  if [[ ! -f "$_OC_AUTH_APIKEY_SLOT" ]]; then
+    echo "❌ API key slot missing: $_OC_AUTH_APIKEY_SLOT" >&2
+    echo "   Run 'opencode auth login anthropic' (pick Manual/Create API Key), then 'oc-auth-init apikey'" >&2
+    return 1
+  fi
+  cp "$_OC_AUTH_APIKEY_SLOT" "$_OC_AUTH_FILE"
+  echo "✅ Switched to API key"
+  echo "💡 Restart any running opencode session to apply"
+}
+
+# 현재 활성 auth를 슬롯 파일로 백업 (최초 1회 설정)
+oc-auth-init() {
+  local slot="${1:-}"
+  if [[ ! -f "$_OC_AUTH_FILE" ]]; then
+    echo "❌ No auth.json found. Run 'opencode auth login anthropic' first." >&2
+    return 1
+  fi
+  local atype
+  atype=$(jq -r '.anthropic.type // "none"' "$_OC_AUTH_FILE" 2>/dev/null)
+  case "$slot" in
+    oauth)
+      [[ "$atype" != "oauth" ]] && { echo "❌ Current auth type is '$atype', not 'oauth'. Re-login with OAuth first." >&2; return 1; }
+      cp "$_OC_AUTH_FILE" "$_OC_AUTH_OAUTH_SLOT"
+      echo "✅ OAuth credentials saved to slot"
+      ;;
+    apikey|api)
+      [[ "$atype" != "api" ]] && { echo "❌ Current auth type is '$atype', not 'api'. Re-login with API key first." >&2; return 1; }
+      cp "$_OC_AUTH_FILE" "$_OC_AUTH_APIKEY_SLOT"
+      echo "✅ API key credentials saved to slot"
+      ;;
+    *)
+      echo "Usage: oc-auth-init <oauth|apikey>" >&2
+      return 1
+      ;;
+  esac
+}
+
+oc-oauth-restart() {
+  oc-oauth || return $?
+  pgrep -f "opencode" >/dev/null 2>&1 && { pkill -f "opencode" 2>/dev/null; echo "🔄 Killed running opencode processes"; }
+}
+
+oc-apikey-restart() {
+  oc-apikey || return $?
+  pgrep -f "opencode" >/dev/null 2>&1 && { pkill -f "opencode" 2>/dev/null; echo "🔄 Killed running opencode processes"; }
+}
+
 # Screenshot helper
 export SCREENSHOT_DIR="$HOME/Desktop/screenshots"
 mkdir -p "$SCREENSHOT_DIR" 2>/dev/null
