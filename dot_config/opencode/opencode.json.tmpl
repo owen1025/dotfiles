@@ -1,7 +1,7 @@
 {
   "plugin": [
     "opencode-ntfy.sh@latest",
-    "oh-my-openagent@latest"{{ if .useAnthropicAuth }},
+    "oh-my-openagent@4.19.1"{{ if .useAnthropicAuth }},
     "@ex-machina/opencode-anthropic-auth@latest"{{ end }}
   ],
   "mcp": {
@@ -180,47 +180,6 @@
     }
   },
   "provider": {
-    "openai": {
-      "name": "OpenAI",
-      "models": {
-        "gpt-5.5": {
-          "name": "GPT-5.5",
-          "attachment": true,
-          "limit": {
-            "context": 1048576,
-            "output": 65536
-          },
-          "modalities": {
-            "input": [
-              "text",
-              "image",
-              "pdf"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "gpt-5.5-mini": {
-          "name": "GPT-5.5 Mini",
-          "attachment": true,
-          "limit": {
-            "context": 1048576,
-            "output": 32768
-          },
-          "modalities": {
-            "input": [
-              "text",
-              "image",
-              "pdf"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        }
-      }
-    },
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Ollama (Local)",
