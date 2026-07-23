@@ -179,6 +179,21 @@
       "enabled": true
     }
   },
+  "lsp": {
+    "markdown": {
+      "command": [
+        "npx",
+        "-y",
+        "-p",
+        "vscode-langservers-extracted@4.8.0",
+        "vscode-markdown-language-server",
+        "--stdio"
+      ],
+      "extensions": [
+        ".md"
+      ]
+    }
+  },
   "provider": {
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
