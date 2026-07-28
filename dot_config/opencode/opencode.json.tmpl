@@ -1,7 +1,7 @@
 {
   "plugin": [
     "opencode-ntfy.sh@latest",
-    "oh-my-openagent@4.19.1"{{ if .useAnthropicAuth }},
+    "oh-my-openagent@4.19.2"{{ if .useAnthropicAuth }},
     "@ex-machina/opencode-anthropic-auth@latest"{{ end }}
   ],
   "mcp": {
@@ -12,7 +12,7 @@
         "-y",
         "mcp-server-kubernetes"
       ],
-      "enabled": true
+      "enabled": false
     },
     "playwright": {
       "type": "local",
@@ -48,7 +48,7 @@
         "-y",
         "@tacticlaunch/mcp-linear"
       ],
-      "enabled": true
+      "enabled": false
     },
     "notion": {
       "type": "local",
@@ -96,7 +96,7 @@
         "-y",
         "terraform-mcp-server"
       ],
-      "enabled": true
+      "enabled": false
     },
     "gcp": {
       "type": "local",
@@ -105,7 +105,7 @@
         "-y",
         "mcp-server-gcp"
       ],
-      "enabled": true
+      "enabled": false
     },
     "sequential-thinking": {
       "type": "local",
@@ -168,7 +168,7 @@
         "-y",
         "pulsemcp-server"
       ],
-      "enabled": true
+      "enabled": false
     },
     "glama": {
       "type": "local",
@@ -176,7 +176,7 @@
         "uvx",
         "mcp-glama-registry"
       ],
-      "enabled": true
+      "enabled": false
     }
   },
   "lsp": {
