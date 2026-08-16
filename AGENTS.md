@@ -301,7 +301,6 @@ chezmoi init --apply --promptString email=you@example.com \
    - `trailofbits/skills`, `obra/superpowers`, `automazeio/ccpm`
 
 2. **Sparse-checkout** (`sparse_clone_subset`) — 모노레포에서 몇 개만 선별
-   - `openclaw/skills` → curated subset (`docs/openclaw-skills.md` 참고)
    - `ComposioHQ/awesome-claude-skills` → `mcp-builder`, `skill-creator`
    - `sickn33/antigravity-awesome-skills` → `bash-linux`, `analyze-project`, `autonomous-agent-patterns`
    - 1400+ 스킬 중 일부만 pull → 디스크 절약 (~5MB)
@@ -338,17 +337,17 @@ chezmoi init --apply --promptString email=you@example.com \
 
 **문제**: OpenCode의 Skill MCP tool은 `~/.config/opencode/skills/` 기준 **depth ≤3 까지만** path-based registry에 등록한다. 더 깊은 SKILL.md는 시스템 프롬프트의 `<available_skills>` 리스트에는 description으로 노출되지만 `Skill(name=...)` 호출 시 "not found" 에러로 실패한다 (그리고 `task(load_skills=[...])` 주입에도 실패할 가능성이 있음).
 
-**영향받는 스킬 (총 82개):**
-- `trailofbits/plugins/{plugin}/skills/{skill}` (5-level) — 72개 (semgrep, codeql, address-sanitizer, 모든 vulnerability scanner 등)
-- `openclaw/skills/{maintainer}/{skill}` (4-level) — 9개 (1password, gog, markdown-converter 등)
-- `trailofbits/.codex/skills/gh-cli` (4-level) — 1개
+**영향받는 스킬 (2026-08-16 기준 78개):**
+- `trailofbits/plugins/{plugin}/skills/{skill}` (5-level) — 78개 (semgrep, codeql, address-sanitizer, gh-cli, 모든 vulnerability scanner 등)
 
 **해결**: `run_once_install-opencode-skills.sh` 의 `flatten_deep_skills` 함수가 depth ≥4 SKILL.md 마다 depth-1 위치에 basename symlink 생성:
 
 ```
 ~/.config/opencode/skills/semgrep -> trailofbits/plugins/static-analysis/skills/semgrep
-~/.config/opencode/skills/1password -> openclaw/skills/steipete/1password
+~/.config/opencode/skills/gh-cli -> trailofbits/plugins/gh-cli/skills/gh-cli
 ```
+
+개수는 업스트림이 스킬을 추가·이동·삭제할 때마다 바뀐다. 설치 시점에 한 번만 평탄화하면 pull 이후 symlink가 깨진 채 남으므로, cs 프로파일의 `agent-update` daily cron이 `reflatten_skills`로 매일 재생성한다 (`~/.hermes/profiles/cs/scripts/agent_update.sh`).
 
 **메커니즘:**
 - 추적: `.flatten-manifest.txt` (생성된 symlink 이름 목록)

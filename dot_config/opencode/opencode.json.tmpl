@@ -1,7 +1,6 @@
 {
   "plugin": [
-    "opencode-ntfy.sh@latest",
-    "oh-my-openagent@4.19.4"{{ if .useAnthropicAuth }},
+    "opencode-ntfy.sh@latest"{{ if .useAnthropicAuth }},
     "@ex-machina/opencode-anthropic-auth@latest"{{ end }}
   ],
   "mcp": {

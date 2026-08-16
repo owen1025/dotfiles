@@ -37,6 +37,39 @@ sparse_clone_subset() {
 	git -C "$dir" checkout
 }
 
+# pinned_sparse_clone_subset DIR URL PIN PATH [PATH...]
+# Like sparse_clone_subset, but it hard-pins HEAD to a specific commit and
+# refuses to silently accept an existing checkout at a different commit.
+pinned_sparse_clone_subset() {
+	local dir="$1" url="$2" pin="$3"
+	shift 3
+	local paths=("$@")
+	local head=""
+
+	if [ -e "$dir" ]; then
+		if ! git -C "$dir" rev-parse --git-dir >/dev/null 2>&1; then
+			echo "[refuse] $(basename "$dir") exists but is not a git checkout; not overwriting" >&2
+			return 1
+		fi
+
+		head=$(git -C "$dir" rev-parse HEAD 2>/dev/null || true)
+		echo "[inspect] $(basename "$dir") existing HEAD=${head:-unknown} expected=$pin"
+		if [ "$head" != "$pin" ]; then
+			echo "[refuse] $(basename "$dir") is not pinned to $pin; leaving existing checkout untouched" >&2
+			return 1
+		fi
+
+		echo "[skip] $(basename "$dir") already pinned to $pin"
+		return 0
+	fi
+
+	echo "[pinned-sparse-clone] $url@$pin → ${paths[*]}"
+	git clone --filter=blob:none --no-checkout "$url" "$dir"
+	git -C "$dir" sparse-checkout init --cone
+	git -C "$dir" sparse-checkout set "${paths[@]}"
+	git -C "$dir" checkout --detach "$pin"
+}
+
 clone_if_missing "$OPENCODE_SKILLS/trailofbits" \
 	"https://github.com/trailofbits/skills.git"
 
@@ -46,29 +79,11 @@ clone_if_missing "$OPENCODE_SKILLS/superpowers" \
 clone_if_missing "$OPENCODE_SKILLS/ccpm" \
 	"https://github.com/automazeio/ccpm"
 
-# openclaw/skills monorepo (clawskills.sh). Curated subset. See docs/openclaw-skills.md for deps+env vars.
-sparse_clone_subset "$OPENCODE_SKILLS/openclaw" \
-	"https://github.com/openclaw/skills.git" \
-	"skills/steipete/markdown-converter" \
-	"skills/steipete/gog" \
-	"skills/steipete/1password" \
-	"skills/arnarsson/git-essentials" \
-	"skills/jk-0001/automation-workflows" \
-	"skills/oyi77/data-analyst" \
-	"skills/shawnpana/browser-use" \
-	"skills/whiteknight07/exa-web-search-free" \
-	"skills/udiedrichsen/stock-analysis"
-
-case "$(uname -s)" in
-Darwin)
-	if [ -d "$OPENCODE_SKILLS/openclaw" ]; then
-		echo "[sparse-update] openclaw → +macOS-only skills"
-		git -C "$OPENCODE_SKILLS/openclaw" sparse-checkout add \
-			"skills/steipete/apple-notes" \
-			"skills/steipete/apple-reminders" 2>/dev/null || true
-	fi
-	;;
-esac
+# openclaw/skills was removed on 2026-08-16: github.com/openclaw/skills started
+# returning 404, so the 9 curated skills it provided (markdown-converter, gog,
+# 1password, git-essentials, automation-workflows, data-analyst, browser-use,
+# exa-web-search-free, stock-analysis) are gone. Unrelated to the `openclaw` npm
+# CLI in npm-global-packages.txt, which is alive and still used.
 
 # Private repo — requires SSH key (github.com-personal host alias).
 # Non-fatal: skip silently on machines without the key.
@@ -88,6 +103,12 @@ sparse_clone_subset "$OPENCODE_SKILLS/antigravity-skills" \
 	"skills/bash-linux" \
 	"skills/analyze-project" \
 	"skills/autonomous-agent-patterns"
+
+# Ponytail — manually invoked OpenCode skill only, pinned to the exact commit.
+pinned_sparse_clone_subset "$OPENCODE_SKILLS/ponytail-vendor" \
+	"https://github.com/DietrichGebert/ponytail.git" \
+	"16f29800fd2681bdf24f3eb4ccffe38be3baec6b" \
+	"skills/ponytail"
 
 # ---------------------------------------------------------------------------
 # Discovery-pipeline sources (scanned by mcp-skill-discovery polling daemon)
