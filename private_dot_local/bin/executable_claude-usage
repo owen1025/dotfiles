@@ -588,6 +588,10 @@ def main() -> int:
     text = render(state, args.style, ink, width)
     if text:
         print(text)
+    # 이 (스타일, 폭) 조합의 렌더 캐시가 아직 없으면 지금 남겨 둔다. 그래야 100칸이
+    # 아닌 터미널에서도 두 번째 셸부터는 cat 한 번으로 끝난다.
+    if args.startup and not os.path.exists(render_path(args.style, width)):
+        write_renders(state, target)
     return 0
 
 
