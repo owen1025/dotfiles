@@ -12,6 +12,7 @@ alias claude2='CLAUDE_CONFIG_DIR=$HOME/.claude-b claude'
 #   claude-usage --json   원본 JSON
 #   --style bars|panel|compact                  (기본값 $CLAUDE_USAGE_STYLE, 없으면 bars)
 alias claude-limits='claude-usage --refresh'
+alias claude-status='claude-usage --refresh'   # 예전 이름 호환
 
 # 셸 시작 시 출력. 미리 그려 둔 렌더 캐시를 cat 할 뿐이라 비용이 사실상 0이다.
 # 캐시가 낡았으면 일단 출력한 뒤 백그라운드로만 갱신하므로 셸 시작이 절대 느려지지 않는다.
