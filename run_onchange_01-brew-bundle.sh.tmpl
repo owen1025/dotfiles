@@ -6,6 +6,20 @@
 # 그래서 배포된 파일 대신 소스의 Brewfile.tmpl 을 렌더링해 stdin 으로 넘긴다.
 set -e
 eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /home/linuxbrew/.linuxbrew/bin/brew shellenv 2>/dev/null)" || true
-brew bundle --file=- <<'BREWFILE'
+
+BREWFILE=$(cat <<'BREWFILE_EOF'
 {{ includeTemplate "Brewfile.tmpl" . }}
-BREWFILE
+BREWFILE_EOF
+)
+
+# Homebrew 6+ 는 비공식 tap 의 formula/cask 를 `brew trust` 전엔 로드하지 않는다
+# ("Refusing to load formula ... from untrusted tap"). Brewfile 에 적은 tap 은 이미
+# 선택한 것이므로 일괄 신뢰한다. trust 명령이 없는 구버전 brew 에선 조용히 건너뛴다.
+if brew trust --help >/dev/null 2>&1; then
+	while IFS= read -r t; do
+		[ -n "$t" ] || continue
+		brew trust --tap "$t" >/dev/null 2>&1 || true
+	done < <(printf '%s\n' "$BREWFILE" | sed -nE 's/^tap "([^"]+)".*/\1/p')
+fi
+
+printf '%s\n' "$BREWFILE" | brew bundle --file=-
