@@ -1,5 +1,11 @@
 #!/bin/bash
 # Brewfile hash: {{ include "Brewfile.tmpl" | sha256sum }}
+#
+# chezmoi 는 대상 이름 순(run_ 스크립트 포함)으로 적용하므로 "01-brew-bundle.sh" 가
+# "Brewfile" 보다 먼저 실행된다 → 새 머신 첫 apply 에서 ~/Brewfile 이 아직 없다.
+# 그래서 배포된 파일 대신 소스의 Brewfile.tmpl 을 렌더링해 stdin 으로 넘긴다.
 set -e
 eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /home/linuxbrew/.linuxbrew/bin/brew shellenv 2>/dev/null)" || true
-brew bundle --file="{{ .chezmoi.homeDir }}/Brewfile"
+brew bundle --file=- <<'BREWFILE'
+{{ includeTemplate "Brewfile.tmpl" . }}
+BREWFILE

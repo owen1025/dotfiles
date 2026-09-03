@@ -287,6 +287,8 @@ chezmoi init --apply \
 - **새 머신 첫 실행** — Xcode CLT 필수 (`xcode-select --install` 먼저), Homebrew 설치 시 RETURN + sudo 필요
 - **vim 플러그인** — `run_before_04`가 Vundle+vim-plug 설치 후 `PluginInstall`+`PlugInstall` 자동 실행. 첫 실행 시 colorscheme 에러가 나오지만 플러그인 설치 후 해결됨
 - **`run_onchange_` brew bundle** — 첫 실행 시 20분+ 소요. cask 설치 시 sudo 비밀번호 요청 가능
+- **스크립트/파일 적용 순서** — chezmoi 는 `run_before_`/`run_after_` 를 제외한 스크립트를 **파일과 섞어 대상 이름 순**으로 적용한다. 숫자로 시작하는 `01-brew-bundle.sh` 는 `Brewfile`(대문자) 보다 먼저 실행되므로 새 머신 첫 apply 에선 `~/Brewfile` 이 아직 없다. 그래서 `run_onchange_01` 은 `includeTemplate "Brewfile.tmpl"` 로 소스를 직접 렌더링해 `brew bundle --file=-` 에 넘긴다. 배포된 홈 파일에 의존하는 스크립트를 새로 쓸 때 같은 함정 주의 (2026-09-03 owen-macmini 부트스트랩에서 발견)
+- **macOS authorized_keys** — `private_authorized_keys.tmpl` 은 darwin 에서 빈 내용 → chezmoi 가 대상 파일을 **삭제**한다. 맥에 손으로 넣은 키는 apply 마다 사라지므로 템플릿에 분기(현재 Owenui-Macmini 한정 studio 키)로 넣어야 한다
 - **opencode.json of `${VAR}`** — chezmoi 템플릿이 아닌 런타임 환경변수 확장. 절대 `.tmpl`로 만들지 않음
 - **Linuxbrew PATH 우선순위** — Linuxbrew > /usr/bin. `git`, `zsh` 등은 brew 버전 사용됨
 - **systemd/cron에서 PATH** — non-interactive 컨텍스트에서는 `/home/linuxbrew/.linuxbrew/bin/<tool>` 직접 호출 권장
