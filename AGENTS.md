@@ -41,6 +41,7 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply owen1025
   ├── run_before_*.sh             ← 부트스트랩 (brew, oh-my-zsh, antigen, fzf, vim plugins, tmux, zsh-kubecolor)
   ├── run_before_-1-install-prerequisites.sh ← Linux prereq 체크 (apt 패키지 존재 확인)
   ├── run_onchange_*.sh.tmpl      ← 변경 감지 자동 실행 (brew bundle, npm install)
+  ├── run_onchange_06-claude-remote-control.sh ← Claude Code Remote Control 세션 자동 활성화
   ├── run_once_*.sh               ← 1회 실행 (zshrc.local 복사, OpenCode skills, migration cleanup)
   ├── run_once_install-linux-zsh-default.sh  ← Linux only: /etc/shells 등록 + chsh 자동화
   ├── run_once_install-docker.sh             ← Linux only: Docker CE + compose plugin

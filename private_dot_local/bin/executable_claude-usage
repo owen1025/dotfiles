@@ -49,8 +49,9 @@ DEFAULT_STYLE = os.environ.get("CLAUDE_USAGE_STYLE", "bars")
 def discover_accounts() -> list[tuple[str, str]]:
     """[(표시이름, CLAUDE_CONFIG_DIR)] 목록.
 
-    CLAUDE_USAGE_ACCOUNTS="claude:~/.claude,claude2:~/.claude-b" 로 덮어쓸 수 있다.
-    지정이 없으면 기본 두 계정 + 추가로 만든 ~/.claude-* 디렉터리를 자동으로 찾는다.
+    CLAUDE_USAGE_ACCOUNTS="claude:~/.claude,claude2:~/.claude-b,claude3:~/.claude-c" 로 덮어쓸 수 있다.
+    지정이 없으면 기본 두 계정 + 추가로 만든 ~/.claude-* 디렉터리(.credentials.json 있는 것만 — 즉
+    로그인 전엔 안 보인다)를 자동으로 찾는다. 한 글자 접미사는 서수로(-c → claude3).
     """
     env = os.environ.get("CLAUDE_USAGE_ACCOUNTS")
     if env:
@@ -76,7 +77,11 @@ def discover_accounts() -> list[tuple[str, str]]:
         path = os.path.join(HOME, name)
         if path in seen or not os.path.isfile(os.path.join(path, ".credentials.json")):
             continue
-        accounts.append((f"claude:{name[len('.claude-'):]}", path))
+        suffix = name[len(".claude-"):]
+        # ~/.claude-b → claude2, ~/.claude-c → claude3 … (셸 함수 이름과 일치); 그 외는 claude:<suffix>
+        label = (f"claude{ord(suffix) - ord('a') + 1}" if len(suffix) == 1 and suffix.isalpha() and suffix.islower()
+                 else f"claude:{suffix}")
+        accounts.append((label, path))
     return accounts
 
 
