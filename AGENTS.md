@@ -255,10 +255,19 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply owen1025
 
 TTY가 없는 환경에서 `chezmoi init`은 prompt 입력을 받을 수 없으므로 플래그로 전달:
 
+`--promptString`/`--promptBool` 의 키는 데이터 이름이 아니라 **프롬프트 문구** 다
+(`.chezmoi.toml.tmpl` 의 `promptStringOnce . "email" "Git email address"` → 키는 `Git email address`).
+키를 잘못 주면 TTY 를 열려다 `could not open a new TTY` 로 실패한다.
+
 ```bash
-chezmoi init --apply --promptString email=you@example.com \
-  --promptString name="Your Name" --promptBool useAnthropicAuth=false owen1025
+chezmoi init --apply \
+  --promptString "Git email address=you@example.com" \
+  --promptString "Git full name=Your Name" \
+  --promptBool "Use Anthropic auth plugin for OpenCode (not Claude Code CLI)=false" owen1025
 ```
+
+또는 `~/.config/chezmoi/chezmoi.toml` 에 `[data]` 를 미리 써 두면 `*Once` 함수가 프롬프트를 건너뛴다
+(2026-09-03 owen-macmini 부트스트랩에서 이 방식을 사용).
 
 ### Known Limitations (Ubuntu 헤드리스 서버)
 

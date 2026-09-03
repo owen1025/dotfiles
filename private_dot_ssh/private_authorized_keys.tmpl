@@ -1,6 +1,9 @@
 {{- /* authorized_keys — SSH public keys allowed to log in as this user.
-       Only deployed on Linux machines (GCP/server role).
-       Mac machines are clients, not servers, so this file is not created there.
+       Deployed on Linux machines (GCP/server role) with the full key set.
+       Mac machines are clients: the template renders empty there, and chezmoi
+       REMOVES an empty target — so any hand-added key on a Mac is wiped by
+       every `chezmoi apply`. The one exception is the Mac mini (owen-macmini),
+       which studio administers over Tailscale; it gets studio's key below.
 
        Managed via chezmoi. To add a new key:
          1. Append the key below with a comment identifying the device/owner
@@ -23,4 +26,8 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBRGA69jYvoV42PkRy0fdIOYMNYHVIpAl9hIMVGoPowW
 
 # Personal Mac 3 (owen-macmini, Mac mini M4, 2026-09-03)
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOvoRNWC3s7Z2CuP6xU5nejfA3bf7hlIh1yP6GYi9mbq myartame@gmail.com
+{{- end }}
+{{- if and (eq .chezmoi.os "darwin") (eq .chezmoi.hostname "Owenui-Macmini") }}
+# studio (Linux VM, 100.116.152.109) — administers this Mac mini over Tailscale
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP/xLX1a3KXmyUBXCN/QbbibgtTNLV6/UlXBWV7vck5M studio-linux
 {{- end }}
