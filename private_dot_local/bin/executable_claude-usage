@@ -1,8 +1,20 @@
 #!/usr/bin/env python3
-"""claude-usage — Claude Code 다중 계정 사용량/한도 대시보드.
+"""claude-usage — Claude Code 다중 계정 + ChatGPT(Codex) 계정 사용량/한도 대시보드.
 
 CLAUDE_CONFIG_DIR 로 분리된 각 계정(`claude`, `claude2`, …)의 세션(5시간) 한도와
 주간(7일) 한도를 Anthropic OAuth usage API 에서 읽어 요약한다.
+
+ChatGPT 계정(2026-09-08)은 Codex CLI 가 로그인해 둔 `$CODEX_HOME/auth.json`(기본 `~/.codex`)의
+토큰으로 `chatgpt.com/backend-api/wham/usage` 를 읽는다 — Codex CLI `/status` 가 보는 바로 그 창
+(플랜에 따라 주간 하나 또는 5시간+주간). 토큰은 읽기만 하고 절대 갱신하지 않는다(갱신은 Codex CLI 의
+몫 — refresh 토큰이 회전형이라 여기서 돌리면 CLI 쪽 로그인이 깨진다). 만료(발급 후 10일)면 "토큰 만료"
+로 보이고 `codex` 를 한 번 실행하면 살아난다. `CLAUDE_USAGE_CHATGPT=0` 으로 끈다.
+
+크레덴셜은 Claude Code 가 두는 곳에서 그대로 읽는다:
+  macOS  → 키체인 `Claude Code-credentials` (기본 계정)
+           `Claude Code-credentials-<sha256(CLAUDE_CONFIG_DIR)[:8]>` (보조 계정)
+  그 외  → <configdir>/.credentials.json
+둘 다 있으면 더 늦게 만료되는(= 가장 최근에 갱신된) 쪽을 쓴다.
 
 셸 시작을 절대 막지 않는 3단 캐시:
   1. 렌더 캐시(render-<style>-<width>.txt) — zsh 가 그냥 cat 한다 (~1ms)
@@ -14,7 +26,9 @@ CLAUDE_CONFIG_DIR 로 분리된 각 계정(`claude`, `claude2`, …)의 세션(5
 from __future__ import annotations
 
 import argparse
+import base64
 import concurrent.futures
+import hashlib
 import json
 import os
 import re
@@ -24,9 +38,10 @@ import time
 import unicodedata
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
 
 API = "https://api.anthropic.com"
+CHATGPT_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"
 UA = "claude-usage/1.0 (dotfiles; local shell status)"
 HOME = os.path.expanduser("~")
 CACHE_DIR = os.environ.get(
@@ -50,7 +65,7 @@ def discover_accounts() -> list[tuple[str, str]]:
     """[(표시이름, CLAUDE_CONFIG_DIR)] 목록.
 
     CLAUDE_USAGE_ACCOUNTS="claude:~/.claude,claude2:~/.claude-b,claude3:~/.claude-c" 로 덮어쓸 수 있다.
-    지정이 없으면 기본 두 계정 + 추가로 만든 ~/.claude-* 디렉터리(.credentials.json 있는 것만 — 즉
+    지정이 없으면 기본 두 계정 + 추가로 만든 ~/.claude-* 디렉터리(크레덴셜이 있는 것만 — 즉
     로그인 전엔 안 보인다)를 자동으로 찾는다. 한 글자 접미사는 서수로(-c → claude3).
     """
     env = os.environ.get("CLAUDE_USAGE_ACCOUNTS")
@@ -75,7 +90,7 @@ def discover_accounts() -> list[tuple[str, str]]:
         if not name.startswith(".claude-"):
             continue
         path = os.path.join(HOME, name)
-        if path in seen or not os.path.isfile(os.path.join(path, ".credentials.json")):
+        if path in seen or not os.path.isdir(path) or not has_creds(path):
             continue
         suffix = name[len(".claude-"):]
         # ~/.claude-b → claude2, ~/.claude-c → claude3 … (셸 함수 이름과 일치); 그 외는 claude:<suffix>
@@ -85,27 +100,216 @@ def discover_accounts() -> list[tuple[str, str]]:
     return accounts
 
 
+# ─────────────────────────────────────────── ChatGPT(Codex) 계정
+
+
+def discover_chatgpt_accounts() -> list[tuple[str, str]]:
+    """[(표시이름, CODEX_HOME)] — Codex CLI 가 로그인해 둔 ChatGPT 계정.
+
+    CLAUDE_USAGE_CHATGPT="chatgpt:~/.codex,chatgpt2:~/.codex-b" 로 덮어쓰고, "0"/"off" 면 끈다.
+    지정이 없으면 $CODEX_HOME(기본 ~/.codex) 에 로그인 토큰이 있을 때만 한 줄 — 로그인 전엔 안 보인다.
+    """
+    env = os.environ.get("CLAUDE_USAGE_CHATGPT")
+    if env is not None and env.strip().lower() in ("0", "off", "false"):
+        return []
+    if env and env.strip():
+        out = []
+        for chunk in env.split(","):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            label, _, path = chunk.partition(":")
+            out.append((label.strip() or "chatgpt",
+                        os.path.expanduser(path.strip()) if path.strip() else os.path.join(HOME, ".codex")))
+        return out
+    home = os.environ.get("CODEX_HOME", "").strip() or os.path.join(HOME, ".codex")
+    return [("chatgpt", os.path.expanduser(home))] if _codex_tokens(home) else []
+
+
+def _codex_tokens(codex_home: str) -> dict | None:
+    """Codex CLI 의 auth.json → tokens 블록(access_token 이 있을 때만)."""
+    try:
+        with open(os.path.join(os.path.expanduser(codex_home), "auth.json")) as fh:
+            tokens = json.load(fh).get("tokens")
+    except Exception:
+        return None
+    return tokens if isinstance(tokens, dict) and tokens.get("access_token") else None
+
+
+def _jwt_claims(token: str) -> dict:
+    """서명 검증 없이 JWT payload 만 읽는다(만료·이메일·account id 표시용)."""
+    try:
+        payload = token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        claims = json.loads(base64.urlsafe_b64decode(payload))
+        return claims if isinstance(claims, dict) else {}
+    except Exception:
+        return {}
+
+
+CHATGPT_PLAN = {"free": "Free", "go": "Go", "plus": "Plus", "pro": "Pro", "prolite": "Pro Lite",
+                "team": "Team", "business": "Business", "enterprise": "Enterprise", "edu": "Edu"}
+
+
+def chatgpt_plan_label(plan_type: str | None) -> str:
+    key = (plan_type or "").strip().lower()
+    return CHATGPT_PLAN.get(key, key.title()) if key else ""
+
+
+def _window_name(seconds) -> str:
+    """limit_window_seconds → 표시 이름. 5시간 창 = 세션, 7일 창 = 주간, 그 외는 길이 그대로."""
+    if not isinstance(seconds, (int, float)) or seconds <= 0:
+        return "한도"
+    if seconds <= 6 * 3600:
+        return "세션"
+    if abs(seconds - 7 * 86400) <= 3600:
+        return "주간"
+    days = seconds / 86400
+    return f"{int(round(days))}일" if days >= 1 else f"{int(round(seconds / 3600))}시간"
+
+
+def chatgpt_rows(body: dict) -> list[dict]:
+    """wham/usage 응답 → normalize() 와 같은 [{name, group, percent, resets_at, severity}]."""
+    rows: list[dict] = []
+
+    def add(prefix: str, rl: dict) -> None:
+        blown = bool(rl.get("limit_reached"))
+        for key in ("primary_window", "secondary_window"):
+            win = rl.get(key)
+            if not isinstance(win, dict) or win.get("used_percent") is None:
+                continue
+            secs = win.get("limit_window_seconds")
+            name = _window_name(secs)
+            reset = win.get("reset_at")
+            resets_at = (datetime.fromtimestamp(reset, tz=timezone.utc).isoformat()
+                         if isinstance(reset, (int, float)) and reset > 0 else None)
+            rows.append({"name": f"{prefix} {name}".strip(),
+                         "group": "session" if isinstance(secs, (int, float)) and secs <= 6 * 3600 else "weekly",
+                         "percent": win.get("used_percent"), "resets_at": resets_at,
+                         "severity": "rejected" if blown else "normal",
+                         "extra": bool(prefix)})                    # 모델별 별도 한도 — 컴팩트 뷰는 메인 창만
+
+    rl = body.get("rate_limit")
+    if isinstance(rl, dict):
+        add("", rl)
+    for extra in body.get("additional_rate_limits") or []:      # 모델별 별도 한도 (예: Codex Spark)
+        if isinstance(extra, dict) and isinstance(extra.get("rate_limit"), dict):
+            add(str(extra.get("limit_name") or "추가 한도"), extra["rate_limit"])
+    return rows
+
+
+def chatgpt_note(body: dict) -> str | None:
+    parts = []
+    credits = body.get("credits") or {}
+    if credits.get("has_credits"):
+        bal = credits.get("balance")
+        parts.append("크레딧 무제한" if credits.get("unlimited") else f"크레딧 잔액 ${bal}")
+    banked = (body.get("rate_limit_reset_credits") or {}).get("available_count")
+    if isinstance(banked, (int, float)) and banked > 0:
+        parts.append(f"리셋 크레딧 {int(banked)}개")
+    return " · ".join(parts) or None
+
+
+def fetch_chatgpt_account(label: str, codex_home: str, timeout: float) -> dict:
+    rec: dict = {"label": label, "dir": codex_home, "kind": "chatgpt", "login_cmd": "codex login"}
+    tokens = _codex_tokens(codex_home)
+    if not tokens:
+        rec["state"] = "logged_out"
+        return rec
+    access = str(tokens.get("access_token") or "")
+    claims = _jwt_claims(access)
+    exp = claims.get("exp") or 0
+    rec["token_expires_at"] = exp
+    rec["login_cmd"] = "codex"                                   # 만료/실패 시엔 한 번 띄우면 CLI 가 갱신한다
+    auth = claims.get("https://api.openai.com/auth") or {}
+    prof = claims.get("https://api.openai.com/profile") or {}
+    rec["email"] = prof.get("email") or claims.get("email")
+    if exp and exp <= time.time():
+        rec["state"] = "token_expired"
+        return rec
+    account_id = str(tokens.get("account_id") or auth.get("chatgpt_account_id") or "").strip()
+    headers = {"Authorization": f"Bearer {access}", "Accept": "application/json", "User-Agent": "codex-cli"}
+    if account_id:
+        headers["ChatGPT-Account-Id"] = account_id
+    status, body = _http_get(CHATGPT_USAGE_URL, headers, timeout)
+    if status in (401, 403):
+        rec["state"] = "token_expired"
+        return rec
+    if status != 200 or not isinstance(body, dict):
+        rec["state"] = "error"
+        rec["error"] = f"HTTP {status}" if status else str(body)
+        return rec
+    rec["state"] = "ok"
+    rec["rows"] = chatgpt_rows(body)
+    rec["note"] = chatgpt_note(body)
+    rec["plan"] = chatgpt_plan_label(body.get("plan_type") or auth.get("chatgpt_plan_type"))
+    return rec
+
+
 # ─────────────────────────────────────────── API
 
 
-def _creds(config_dir: str) -> dict | None:
+DEFAULT_CONFIG_DIR = os.path.join(HOME, ".claude")
+KEYCHAIN_SERVICE = "Claude Code-credentials"
+
+
+def _keychain_services(config_dir: str) -> list[str]:
+    """이 계정의 크레덴셜이 들어 있을 수 있는 macOS 키체인 서비스명 후보.
+
+    Claude Code 는 CLAUDE_CONFIG_DIR 을 바꾼 계정을 `Claude Code-credentials-<절대경로 sha256 앞 8자리>`
+    로 구분한다(경로는 환경변수에 준 그대로, 끝 슬래시 없이). 기본 디렉터리(~/.claude)는 접미사가 없다.
+    """
+    paths = [config_dir]
+    if os.path.normpath(config_dir) != config_dir:
+        paths.append(os.path.normpath(config_dir))
+    out = [f"{KEYCHAIN_SERVICE}-{hashlib.sha256(p.encode()).hexdigest()[:8]}" for p in paths]
+    if os.path.realpath(config_dir) == os.path.realpath(DEFAULT_CONFIG_DIR):
+        out.insert(0, KEYCHAIN_SERVICE)
+    return out
+
+
+def _oauth_from_keychain(config_dir: str) -> list[dict]:
+    if sys.platform != "darwin":
+        return []
+    found = []
+    for svc in _keychain_services(config_dir):
+        try:
+            proc = subprocess.run(["security", "find-generic-password", "-s", svc, "-w"],
+                                  capture_output=True, text=True, timeout=5)
+            oauth = json.loads(proc.stdout).get("claudeAiOauth") if proc.returncode == 0 else None
+        except Exception:
+            oauth = None
+        if oauth:
+            found.append(oauth)
+    return found
+
+
+def _oauth_from_file(config_dir: str) -> list[dict]:
     try:
         with open(os.path.join(config_dir, ".credentials.json")) as fh:
-            return json.load(fh).get("claudeAiOauth") or None
+            oauth = json.load(fh).get("claudeAiOauth")
     except Exception:
+        return []
+    return [oauth] if oauth else []
+
+
+def _creds(config_dir: str) -> dict | None:
+    """키체인(macOS)과 .credentials.json 중 가장 늦게 만료되는 크레덴셜.
+
+    Claude Code 는 토큰을 갱신할 때 키체인만 새로 쓰므로, 예전 버전이 남긴 파일보다 키체인이 새롭다.
+    """
+    found = _oauth_from_keychain(config_dir) + _oauth_from_file(config_dir)
+    if not found:
         return None
+    return max(found, key=lambda o: o.get("expiresAt") or 0)
 
 
-def _get(path: str, token: str, timeout: float) -> tuple[int, object]:
-    req = urllib.request.Request(
-        API + path,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "anthropic-beta": "oauth-2025-04-20",
-            "Accept": "application/json",
-            "User-Agent": UA,
-        },
-    )
+def has_creds(config_dir: str) -> bool:
+    return _creds(config_dir) is not None
+
+
+def _http_get(url: str, headers: dict, timeout: float) -> tuple[int, object]:
+    req = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return resp.status, json.loads(resp.read().decode())
@@ -115,8 +319,17 @@ def _get(path: str, token: str, timeout: float) -> tuple[int, object]:
         return 0, type(exc).__name__
 
 
+def _get(path: str, token: str, timeout: float) -> tuple[int, object]:
+    return _http_get(API + path, {
+        "Authorization": f"Bearer {token}",
+        "anthropic-beta": "oauth-2025-04-20",
+        "Accept": "application/json",
+        "User-Agent": UA,
+    }, timeout)
+
+
 def fetch_account(label: str, config_dir: str, timeout: float) -> dict:
-    rec: dict = {"label": label, "dir": config_dir}
+    rec: dict = {"label": label, "dir": config_dir, "kind": "claude"}
     oauth = _creds(config_dir)
     if not oauth:
         rec["state"] = "logged_out"
@@ -200,6 +413,23 @@ def extra_usage_line(usage: dict) -> str | None:
     if limit:
         return f"추가 크레딧 {used or 0}/{limit}" + (f" ({int(util)}%)" if util is not None else "")
     return f"추가 크레딧 {used or 0} 사용"
+
+
+def rows_of(acct: dict) -> list[dict]:
+    """계정 종류에 상관없이 렌더러가 쓰는 한도 행. ChatGPT 는 조회 때 이미 평탄화해 둔다."""
+    if acct.get("kind") == "chatgpt":
+        return list(acct.get("rows") or [])
+    return normalize(acct.get("usage") or {})
+
+
+def note_of(acct: dict) -> str | None:
+    if acct.get("kind") == "chatgpt":
+        return acct.get("note")
+    return extra_usage_line(acct.get("usage") or {})
+
+
+def title_of(accounts: list[dict]) -> str:
+    return "Claude · ChatGPT 사용량" if any(a.get("kind") == "chatgpt" for a in accounts) else "Claude 사용량"
 
 
 # ─────────────────────────────────────────── 폭/시간 포맷
@@ -329,7 +559,8 @@ def problem_of(acct: dict) -> tuple[str, str] | None:
     if acct.get("state") == "ok":
         return None
     icon, msg = STATE_MSG.get(acct.get("state"), ("⚠", "알 수 없는 상태"))
-    return icon, msg.format(cmd=acct.get("label", "claude"), err=acct.get("error", "?"))
+    cmd = acct.get("login_cmd") or acct.get("label", "claude")
+    return icon, msg.format(cmd=cmd, err=acct.get("error", "?"))
 
 
 # ─────────────────────────────────────────── 렌더러
@@ -351,8 +582,8 @@ def render_bars(accounts, stamp, ink, width) -> str:
     terse = width < 84
     bar_w = 24 if width >= 96 else (18 if width >= 84 else (12 if width >= 72 else 8))
     name_w = max((dwidth(r["name"]) for a in accounts if a.get("state") == "ok"
-                  for r in normalize(a["usage"])), default=8)
-    out = [f" {ink.bold('Claude 사용량')}  {ink.dim('·')}  {ink.dim(ago(stamp) + ' 갱신')}",
+                  for r in rows_of(a)), default=8)
+    out = [f" {ink.bold(title_of(accounts))}  {ink.dim('·')}  {ink.dim(ago(stamp) + ' 갱신')}",
            " " + ink.dim("─" * max(20, min(width - 2, 74)))]
     for i, acct in enumerate(accounts):
         if i:
@@ -365,7 +596,7 @@ def render_bars(accounts, stamp, ink, width) -> str:
         if problem:
             out.append(f"   {ink.red(problem[0])} {ink.dim(problem[1])}")
             continue
-        for row in normalize(acct["usage"]):
+        for row in rows_of(acct):
             pct, sev = row["percent"], row["severity"]
             used = "  ?" if pct is None else f"{int(pct):>3d}%"
             left = "  —" if pct is None else f"{100 - min(int(pct), 100):>3d}%"
@@ -378,7 +609,7 @@ def render_bars(accounts, stamp, ink, width) -> str:
                        else f"{ink.by_load(pct, sev, used)} 사용 {ink.dim('·')} 남음 {ink.bold(left)}")
                 tail = f"{ink.dim('·')} {ink.dim(reset_text(row['resets_at'], ' 후 초기화'))}"
             out.append(f"   {pad(row['name'], name_w)}  {gauge(ink, pct, bar_w, sev)}  {mid} {tail}")
-        note = extra_usage_line(acct["usage"])
+        note = note_of(acct)
         if note:
             out.append(f"   {ink.dim(note)}")
     return "\n".join(out)
@@ -386,8 +617,7 @@ def render_bars(accounts, stamp, ink, width) -> str:
 
 def render_panel(accounts, stamp, ink, width) -> str:
     inner = min(max(width - 4, 56), 78)
-    bar_w = max(10, inner - 44)
-    title, right = "Claude 사용량", f"{ago(stamp)} 갱신"
+    title, right = title_of(accounts), f"{ago(stamp)} 갱신"
     fill = max(1, inner - dwidth(title) - dwidth(right) - 4)
     out = [ink.dim("╭─ ") + ink.bold(title) + " " + ink.dim("─" * fill) + " " + ink.dim(right) + ink.dim(" ─╮")]
 
@@ -410,8 +640,10 @@ def render_panel(accounts, stamp, ink, width) -> str:
             out.append(line(f"  {ink.red(icon)} {ink.dim(msg)}", f"  {icon} {msg}"))
             continue
 
-        rows = normalize(acct["usage"])
+        rows = rows_of(acct)
         name_w = max((dwidth(r["name"]) for r in rows), default=8)
+        # 고정 폭: 들여쓰기 2 + 이름 + 2 + 바 + " 100% 남음 100% ↻ " + 리셋(≤10칸) ≈ 이름 + 바 + 24
+        bar_w = max(8, inner - name_w - 24)
         for row in rows:
             pct, sev = row["percent"], row["severity"]
             used = "  ?" if pct is None else f"{int(pct):>3d}%"
@@ -421,7 +653,7 @@ def render_panel(accounts, stamp, ink, width) -> str:
             body = (f"  {pad(row['name'], name_w)}  {gauge(ink, pct, bar_w, sev)} "
                     f"{ink.by_load(pct, sev, used)} {ink.dim('남음')} {ink.bold(left)} {ink.dim('↻ ' + reset)}")
             out.append(line(body, plain))
-        note = extra_usage_line(acct["usage"])
+        note = note_of(acct)
         if note:
             out.append(line(f"  {ink.dim(note)}", f"  {note}"))
     out.append(ink.dim("╰" + "─" * (inner + 2) + "╯"))
@@ -438,7 +670,9 @@ def render_compact(accounts, stamp, ink, width) -> str:
         if problem:
             out.append(f" {ink.bold(ink.blue(lbl))}{ink.red(problem[0])} {ink.dim(problem[1])}")
             continue
-        rows = normalize(acct["usage"])
+        rows = rows_of(acct)
+        main = [r for r in rows if not r.get("extra")] or rows
+        rows = main
         session = next((r for r in rows if r["group"] == "session"), None)
         weekly = next((r for r in rows if r["name"] == "주간 전체"),
                       next((r for r in rows if r["group"] == "weekly"), None))
@@ -456,8 +690,8 @@ def render_compact(accounts, stamp, ink, width) -> str:
         if width >= 100 and email and plain + 1 + dwidth(email) <= width:
             line += " " + ink.dim(email)
         out.append(line)
-    foot = (f"Claude 사용량 · {ago(stamp)} 갱신 · `claude-usage -r` 새로고침" if width >= 72
-            else f"Claude · {ago(stamp)} 갱신")
+    foot = (f"{title_of(accounts)} · {ago(stamp)} 갱신 · `claude-usage -r` 새로고침" if width >= 72
+            else f"{title_of(accounts).replace(' 사용량', '')} · {ago(stamp)} 갱신")
     out.append(" " + ink.dim(foot))
     return "\n".join(out)
 
@@ -508,9 +742,15 @@ def write_renders(state: dict, targets: set[tuple[str, int]]) -> None:
 
 
 def refresh(timeout: float, targets: set[tuple[str, int]] | None = None) -> dict:
-    accounts = discover_accounts()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(accounts))) as pool:
-        results = list(pool.map(lambda a: fetch_account(a[0], a[1], timeout), accounts))
+    jobs = [("claude", label, path) for label, path in discover_accounts()]
+    jobs += [("chatgpt", label, path) for label, path in discover_chatgpt_accounts()]
+
+    def fetch(job):
+        kind, label, path = job
+        return fetch_chatgpt_account(label, path, timeout) if kind == "chatgpt" else fetch_account(label, path, timeout)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(jobs))) as pool:
+        results = list(pool.map(fetch, jobs))
     state = {"fetched_at": time.time(), "accounts": results}
     _atomic_write(CACHE_FILE, json.dumps(state, ensure_ascii=False))
     write_renders(state, (targets or set()) | known_renders())
@@ -549,7 +789,7 @@ def spawn_refresh(style: str, width: int) -> None:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Claude 다중 계정 사용량 대시보드")
+    ap = argparse.ArgumentParser(description="Claude 다중 계정 + ChatGPT(Codex) 사용량 대시보드")
     ap.add_argument("-r", "--refresh", action="store_true", help="즉시 새로 조회(블로킹)")
     ap.add_argument("--startup", action="store_true", help="셸 시작용: 캐시 출력 + 필요하면 백그라운드 갱신")
     ap.add_argument("--style", choices=("bars", "panel", "compact"), default=DEFAULT_STYLE)
