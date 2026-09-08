@@ -64,6 +64,9 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply owen1025
 - `{{ .email }}` → Git 이메일 (.chezmoi.toml.tmpl에서 promptStringOnce)
 - `{{ .name }}` → Git 이름
 
+### 셸 시작 스크립트에서 외부 명령은 `command` 로
+- `.zshrc` 의 `cat()` 은 stdout 이 tty 면 `bat` 을 부른다. `.claude-accounts.zsh` 같은 시작 스크립트에서 `cat` 을 그대로 쓰면 bat 이 터미널 색상 질의(OSC 10/11·DA1)를 보내고, 늦게 온 응답이 프롬프트 입력줄에 찍히거나 페이저가 열려 "새 셸의 커서가 다른 인풋에 들어가 있는" 증상이 난다(2026-09-08 실측). 시작 경로에서는 `command cat` 처럼 함수·alias 를 우회한다. 검증은 pty 로 `zsh -il` 을 띄워 시작 스트림에 `\e[c`·`\e]10;?`·`\e]11;?` 가 없는지 본다.
+
 ### 시크릿 관리
 - **1Password 사용 안 함** — 각 머신에서 `~/.zshrc.local` 수동 관리
 - `dot_zshrc.local.example` → 새 머신에서 `run_once_setup-zshrc-local.sh`가 자동 복사
