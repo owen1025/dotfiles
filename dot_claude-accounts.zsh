@@ -176,7 +176,10 @@ _claude_usage_startup() {
   local render="$dir/render-${style}-${cols}.txt"
 
   if [[ -r $render ]]; then
-    cat -- "$render"
+    # `command cat`: zshrc 의 cat() 은 tty 면 bat 으로 감싼다 — bat 은 테마 감지로 터미널에 색상 질의
+    # (OSC 10/11·DA1)를 보내고 늦게 온 응답이 프롬프트 입력줄에 찍히며, 화면보다 길면 페이저까지 연다
+    # (2026-09-08 "새 셸의 커서가 다른 인풋에 들어가 있다" 실측 원인). 렌더 캐시는 이미 색을 품고 있다.
+    command cat -- "$render"
     # state.json 이 ttl 보다 낡았으면 조용히 백그라운드 갱신 → 다음 셸부터 신선해진다
     local -a fresh=( "$dir"/state.json(Nms-$ttl) )
     (( $#fresh )) || ( claude-usage --refresh --quiet --style "$style" --width "$cols" &! ) 2>/dev/null
