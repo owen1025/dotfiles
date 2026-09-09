@@ -389,14 +389,17 @@ def normalize(usage: dict) -> list[dict]:
             model = (((lim.get("scope") or {}).get("model") or {}).get("display_name") or "").strip()
             if kind == "weekly_scoped" and model:
                 name = f"주간 {model}"
-            rows.append({"name": name, "group": lim.get("group") or kind, "percent": lim.get("percent"),
+            rows.append({"name": name, "kind": kind, "model": model,
+                         "group": lim.get("group") or kind, "percent": lim.get("percent"),
                          "resets_at": lim.get("resets_at"), "severity": lim.get("severity") or "normal"})
         return rows
 
     for key, name, group in LEGACY:                      # 구버전 응답 폴백
         blk = usage.get(key)
         if isinstance(blk, dict) and blk.get("utilization") is not None:
-            rows.append({"name": name, "group": group, "percent": blk.get("utilization"),
+            kind = "session" if key == "five_hour" else ("weekly_all" if key == "seven_day" else "weekly_scoped")
+            rows.append({"name": name, "kind": kind, "model": name.removeprefix("주간 ") if kind == "weekly_scoped" else "",
+                         "group": group, "percent": blk.get("utilization"),
                          "resets_at": blk.get("resets_at"), "severity": "normal"})
     return rows
 
@@ -420,6 +423,20 @@ def rows_of(acct: dict) -> list[dict]:
     if acct.get("kind") == "chatgpt":
         return list(acct.get("rows") or [])
     return normalize(acct.get("usage") or {})
+
+
+def limit_warning(acct: dict) -> str | None:
+    """로그인 성공과 사용 가능량은 별개. 모델 한도 소진을 계정 전체 소진으로 표시하지 않는다."""
+    if acct.get("kind") == "chatgpt" or acct.get("state") != "ok":
+        return None
+    blocked = [r for r in rows_of(acct) if r["severity"] == "rejected"
+               or (r["percent"] is not None and r["percent"] >= 100)]
+    global_limits = [r for r in blocked if r["kind"] in ("session", "weekly_all")]
+    if global_limits:
+        return "⚠ 전체 사용 제한 · " + ", ".join(r["name"] for r in global_limits) + " 소진"
+    if blocked:
+        return "⚠ " + ", ".join(r["model"] or r["name"] for r in blocked) + " 사용 제한 · 주간 한도 소진"
+    return None
 
 
 def note_of(acct: dict) -> str | None:
@@ -469,41 +486,18 @@ def tilde(path: str) -> str:
     return "~" + path[len(HOME):] if path.startswith(HOME) else path
 
 
-def until(iso: str | None) -> str:
-    if not iso:
-        return "—"
-    try:
-        secs = datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp() - time.time()
-    except Exception:
-        return "—"
-    if secs <= 0:
-        return "곧 초기화"
-    days, rem = divmod(int(secs), 86400)
-    hours, rem = divmod(rem, 3600)
-    mins = rem // 60
-    if days:
-        return f"{days}일 {hours}시간"
-    if hours:
-        return f"{hours}시간 {mins}분"
-    return f"{mins}분" if mins else "1분 미만"
-
-
 def reset_text(iso: str | None, suffix: str = "") -> str:
-    """초기화까지 남은 시간. 예약된 초기화 시각이 없으면(=세션 창이 아직 안 돌아감) 꼬리말을 뺀다."""
+    """렌더 캐시를 나중에 읽어도 정확하도록 상대시간 대신 로컬 초기화 시각을 저장한다."""
     if not iso:
         return "초기화 예정 없음" if suffix else "—"
-    return until(iso) + suffix
+    try:
+        return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone().strftime("%m/%d %H:%M") + suffix
+    except (ValueError, TypeError):
+        return "—"
 
 
-def ago(ts: float) -> str:
-    secs = max(0.0, time.time() - ts)
-    if secs < 60:
-        return "방금"
-    if secs < 3600:
-        return f"{int(secs // 60)}분 전"
-    if secs < 86400:
-        return f"{int(secs // 3600)}시간 전"
-    return f"{int(secs // 86400)}일 전"
+def fetched_text(ts: float) -> str:
+    return datetime.fromtimestamp(ts).astimezone().strftime("%m/%d %H:%M %Z 조회")
 
 
 # ─────────────────────────────────────────── 색
@@ -583,7 +577,7 @@ def render_bars(accounts, stamp, ink, width) -> str:
     bar_w = 24 if width >= 96 else (18 if width >= 84 else (12 if width >= 72 else 8))
     name_w = max((dwidth(r["name"]) for a in accounts if a.get("state") == "ok"
                   for r in rows_of(a)), default=8)
-    out = [f" {ink.bold(title_of(accounts))}  {ink.dim('·')}  {ink.dim(ago(stamp) + ' 갱신')}",
+    out = [f" {ink.bold(title_of(accounts))}  {ink.dim('·')}  {ink.dim(fetched_text(stamp))}",
            " " + ink.dim("─" * max(20, min(width - 2, 74)))]
     for i, acct in enumerate(accounts):
         if i:
@@ -596,6 +590,9 @@ def render_bars(accounts, stamp, ink, width) -> str:
         if problem:
             out.append(f"   {ink.red(problem[0])} {ink.dim(problem[1])}")
             continue
+        warning = limit_warning(acct)
+        if warning:
+            out.append(f"   {ink.red(warning)}")
         for row in rows_of(acct):
             pct, sev = row["percent"], row["severity"]
             used = "  ?" if pct is None else f"{int(pct):>3d}%"
@@ -607,7 +604,7 @@ def render_bars(accounts, stamp, ink, width) -> str:
             else:
                 mid = (f"{ink.red('한도 초과')} {ink.dim('·')} 남음 {ink.bold(left)}" if blown
                        else f"{ink.by_load(pct, sev, used)} 사용 {ink.dim('·')} 남음 {ink.bold(left)}")
-                tail = f"{ink.dim('·')} {ink.dim(reset_text(row['resets_at'], ' 후 초기화'))}"
+                tail = f"{ink.dim('·')} {ink.dim(reset_text(row['resets_at'], ' 초기화'))}"
             out.append(f"   {pad(row['name'], name_w)}  {gauge(ink, pct, bar_w, sev)}  {mid} {tail}")
         note = note_of(acct)
         if note:
@@ -617,7 +614,7 @@ def render_bars(accounts, stamp, ink, width) -> str:
 
 def render_panel(accounts, stamp, ink, width) -> str:
     inner = min(max(width - 4, 56), 78)
-    title, right = title_of(accounts), f"{ago(stamp)} 갱신"
+    title, right = title_of(accounts), fetched_text(stamp)
     fill = max(1, inner - dwidth(title) - dwidth(right) - 4)
     out = [ink.dim("╭─ ") + ink.bold(title) + " " + ink.dim("─" * fill) + " " + ink.dim(right) + ink.dim(" ─╮")]
 
@@ -640,6 +637,9 @@ def render_panel(accounts, stamp, ink, width) -> str:
             out.append(line(f"  {ink.red(icon)} {ink.dim(msg)}", f"  {icon} {msg}"))
             continue
 
+        warning = limit_warning(acct)
+        if warning:
+            out.append(line(ink.red(warning), warning))
         rows = rows_of(acct)
         name_w = max((dwidth(r["name"]) for r in rows), default=8)
         # 고정 폭: 들여쓰기 2 + 이름 + 2 + 바 + " 100% 남음 100% ↻ " + 리셋(≤10칸) ≈ 이름 + 바 + 24
@@ -662,7 +662,7 @@ def render_panel(accounts, stamp, ink, width) -> str:
 
 def render_compact(accounts, stamp, ink, width) -> str:
     bar_w = 10 if width >= 100 else (8 if width >= 84 else (6 if width >= 72 else 4))
-    clock_w = 10 if width >= 72 else 0
+    clock_w = 11 if width >= 72 else 0
     out = []
     for acct in accounts:
         lbl = pad(acct["label"], 8)
@@ -690,8 +690,19 @@ def render_compact(accounts, stamp, ink, width) -> str:
         if width >= 100 and email and plain + 1 + dwidth(email) <= width:
             line += " " + ink.dim(email)
         out.append(line)
-    foot = (f"{title_of(accounts)} · {ago(stamp)} 갱신 · `claude-usage -r` 새로고침" if width >= 72
-            else f"{title_of(accounts).replace(' 사용량', '')} · {ago(stamp)} 갱신")
+        warning = limit_warning(acct)
+        if warning:
+            out.append(f"   {ink.red(warning)}")
+        # 주간 전체에 여유가 있어도 Fable 등 모델별 한도는 별도로 소진될 수 있다.
+        for row in rows:
+            if row.get("kind") != "weekly_scoped":
+                continue
+            pct, sev = row["percent"], row["severity"]
+            used = "  ?" if pct is None else f"{int(pct):>3d}%"
+            out.append(f"   {row['name']} {gauge(ink, pct, bar_w, sev)} "
+                       f"{ink.by_load(pct, sev, used)} 사용 {ink.dim('↻' + reset_text(row['resets_at']))}")
+    foot = (f"{title_of(accounts)} · {fetched_text(stamp)} · `claude-usage -r` 새로고침" if width >= 72
+            else f"{title_of(accounts).replace(' 사용량', '')} · {fetched_text(stamp)}")
     out.append(" " + ink.dim(foot))
     return "\n".join(out)
 

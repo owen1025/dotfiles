@@ -66,6 +66,7 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply owen1025
 
 ### 셸 시작 스크립트에서 외부 명령은 `command` 로
 - `.zshrc` 의 `cat()` 은 stdout 이 tty 면 `bat` 을 부른다. `.claude-accounts.zsh` 같은 시작 스크립트에서 `cat` 을 그대로 쓰면 bat 이 터미널 색상 질의(OSC 10/11·DA1)를 보내고, 늦게 온 응답이 프롬프트 입력줄에 찍히거나 페이저가 열려 "새 셸의 커서가 다른 인풋에 들어가 있는" 증상이 난다(2026-09-08 실측). 시작 경로에서는 `command cat` 처럼 함수·alias 를 우회한다. 검증은 pty 로 `zsh -il` 을 띄워 시작 스트림에 `\e[c`·`\e]10;?`·`\e]11;?` 가 없는지 본다.
+- **Claude 사용량은 모델별 주간 한도까지 표시한다 (2026-09-09)**: 세션·주간 전체에 잔여량이 있어도 `limits[].kind=weekly_scoped`(예: Fable)가 100%면 그 모델은 제한된다. compact에서도 모델 행을 생략하지 않고, 모든 스타일에 `Fable 사용 제한`과 `전체 사용 제한`을 구분한다. 인증 토큰 유효 여부와 사용 가능량은 별개다. 렌더 캐시에는 조회·초기화 **절대시각**을 저장(`방금`/`N시간 후`를 저장하면 다음 셸에서도 그대로 남는다), TTL 초과는 이전 조회값임을 표시하고 24시간 초과는 숨긴다. 검증: `python3 -m unittest discover -s docs -p 'test_claude_usage.py' -v`(가짜 응답·임시 캐시, 네트워크 없음).
 
 ### 시크릿 관리
 - **1Password 사용 안 함** — 각 머신에서 `~/.zshrc.local` 수동 관리
