@@ -490,6 +490,6 @@ if [[ -o interactive ]] && [[ -z "$TMUX" ]] && [[ -z "$FASTFETCH_SHOWN" ]] && co
   export FASTFETCH_SHOWN=1
 fi
 
-# Claude Code 듀얼 계정(claude / claude2) + 계정별 사용량 패널
+# Claude Code 다중 계정(claude / claude2 / claude3) + 계정별 사용량 패널
 # 셸 시작마다 각 계정의 세션(5시간)·주간(7일) 한도 사용량/잔여를 보여준다.
 [[ -f ~/.claude-accounts.zsh ]] && source ~/.claude-accounts.zsh

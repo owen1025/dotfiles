@@ -1,7 +1,8 @@
 # Claude Code 다중 계정 — CLAUDE_CONFIG_DIR 로 크레덴셜만 격리한다.
 #   계정 A = ~/.claude    → `claude`   (myartame)
 #   계정 B = ~/.claude-b  → `claude2`  (owenchoi1025)
-#   계정 C = ~/.claude-c  → `claude3`  (2026-08-30 신설 — 최초 1회 실행 후 브라우저 로그인)
+#   계정 C = ~/.claude-c  → `claude3`  (2026-09-11 결제 — 디렉터리·공유 심링크는 만들어 뒀다.
+#                                      최초 1회 `claude3` 실행 = 브라우저 로그인)
 #   새 계정 추가 = 아래 `claude4() { _claude_alt "$HOME/.claude-d" "$@" }` 한 줄.
 #
 # 공유(심링크): projects(세션 트랜스크립트 + 자동 메모리) · file-history · skills · plugins · settings.json
@@ -153,7 +154,8 @@ claude2() { _claude_alt "$HOME/.claude-b" "$@" }
 claude3() { _claude_alt "$HOME/.claude-c" "$@" }
 
 # ── 사용량 대시보드 ──────────────────────────────────────────────────────────
-#   claude-usage          캐시 기준으로 즉시 출력 (계정은 ~/.claude-* 자동 발견: -b→claude2, -c→claude3)
+#   claude-usage          캐시 기준으로 즉시 출력 (계정은 ~/.claude-* 자동 발견: -b→claude2, -c→claude3.
+#                         디렉터리만 있고 로그인 전이면 "미로그인" 줄로 뜬다 — 남은 할 일이 로그인뿐이란 뜻)
 #                         + ChatGPT 계정 한 줄(2026-09-08): Codex CLI 로그인(~/.codex/auth.json)을 읽기만 해서
 #                           주간(플랜에 따라 5시간도) 한도를 같은 패널에 그린다. 끄기 CLAUDE_USAGE_CHATGPT=0,
 #                           다른 CODEX_HOME 은 CLAUDE_USAGE_CHATGPT="chatgpt:~/.codex-b". 토큰 만료면 `codex` 한 번.

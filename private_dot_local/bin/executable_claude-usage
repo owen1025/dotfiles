@@ -65,8 +65,10 @@ def discover_accounts() -> list[tuple[str, str]]:
     """[(표시이름, CLAUDE_CONFIG_DIR)] 목록.
 
     CLAUDE_USAGE_ACCOUNTS="claude:~/.claude,claude2:~/.claude-b,claude3:~/.claude-c" 로 덮어쓸 수 있다.
-    지정이 없으면 기본 두 계정 + 추가로 만든 ~/.claude-* 디렉터리(크레덴셜이 있는 것만 — 즉
-    로그인 전엔 안 보인다)를 자동으로 찾는다. 한 글자 접미사는 서수로(-c → claude3).
+    지정이 없으면 기본 두 계정 + 추가로 만든 ~/.claude-* 디렉터리를 자동으로 찾는다.
+    한 글자 접미사는 서수로(-c → claude3) — `_claude_alt` 가 만든 계정 디렉터리이므로 로그인 전에도
+    "미로그인" 줄로 보여 준다(남은 할 일이 로그인뿐임을 알려준다). 그 밖의 이름(.claude-server-commander
+    처럼 계정이 아닌 디렉터리)은 예전대로 크레덴셜이 있을 때만 보인다.
     """
     env = os.environ.get("CLAUDE_USAGE_ACCOUNTS")
     if env:
@@ -90,13 +92,14 @@ def discover_accounts() -> list[tuple[str, str]]:
         if not name.startswith(".claude-"):
             continue
         path = os.path.join(HOME, name)
-        if path in seen or not os.path.isdir(path) or not has_creds(path):
+        if path in seen or not os.path.isdir(path):
             continue
         suffix = name[len(".claude-"):]
         # ~/.claude-b → claude2, ~/.claude-c → claude3 … (셸 함수 이름과 일치); 그 외는 claude:<suffix>
-        label = (f"claude{ord(suffix) - ord('a') + 1}" if len(suffix) == 1 and suffix.isalpha() and suffix.islower()
-                 else f"claude:{suffix}")
-        accounts.append((label, path))
+        ordinal = len(suffix) == 1 and suffix.isalpha() and suffix.islower()
+        if not ordinal and not has_creds(path):
+            continue
+        accounts.append((f"claude{ord(suffix) - ord('a') + 1}" if ordinal else f"claude:{suffix}", path))
     return accounts
 
 

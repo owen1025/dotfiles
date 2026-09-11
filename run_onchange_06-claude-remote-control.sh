@@ -11,7 +11,8 @@
 #   그래서 SessionEnd 훅 같은 별도 청소 장치는 필요 없다.
 #
 #   끄기       : CLAUDE_REMOTE_CONTROL_AT_STARTUP=false 로 이 스크립트를 실행 (또는 /config)
-#   대상 계정  : CLAUDE_CONFIG_DIRS="$HOME/.claude $HOME/.claude-b" (기본값 = claude, claude2)
+#   대상 계정  : CLAUDE_CONFIG_DIRS="$HOME/.claude $HOME/.claude-b" (기본값 = claude, claude2, claude3)
+#                보조 계정의 settings.json 은 ~/.claude 로 가는 심링크라 실제 기록은 한 번뿐이다.
 #   한 세션만  : claude --remote-control [이름]  /  세션 안에서 /remote-control
 set -euo pipefail
 
@@ -27,7 +28,7 @@ case "$VALUE" in
 		;;
 esac
 
-read -r -a CONFIG_DIRS <<<"${CLAUDE_CONFIG_DIRS:-$HOME/.claude $HOME/.claude-b}"
+read -r -a CONFIG_DIRS <<<"${CLAUDE_CONFIG_DIRS:-$HOME/.claude $HOME/.claude-b $HOME/.claude-c}"
 
 if ! command -v python3 >/dev/null 2>&1; then
 	echo "WARN: python3 가 없어 Remote Control 설정을 건너뛴다" >&2
@@ -47,7 +48,9 @@ for raw in sys.argv[2:]:
         print(f"[skip] {config_dir} — 계정 설정 디렉터리가 없다")
         continue
 
-    path = os.path.join(config_dir, "settings.json")
+    # 보조 계정의 settings.json 은 ~/.claude/settings.json 심링크다. realpath 로 원본을 열어야
+    # os.replace 가 심링크를 일반 파일로 바꿔치기해 공유를 끊어 버리는 일이 없다.
+    path = os.path.realpath(os.path.join(config_dir, "settings.json"))
     try:
         with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
