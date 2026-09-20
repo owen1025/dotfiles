@@ -21,6 +21,11 @@ ChatGPT 계정(2026-09-08)은 Codex CLI 가 로그인해 둔 `$CODEX_HOME/auth.j
   2. 상태 캐시(state.json)                 — 신선도 판정용
   3. 백그라운드 갱신                        — 낡았으면 detach 해서 조용히 새로 받는다
 
+네트워크가 없으면(리부트 직후 첫 셸은 Wi-Fi 결합보다 먼저 뜬다 — 2026-09-20) 그 실패를 캐시에
+쓰지 않는다: 마지막 성공값을 그대로 보여 주고 " ⚠ 네트워크 없음" 한 줄만 덧붙인 뒤, 백그라운드
+갱신이 연결이 돌아올 때까지 짧게 재시도한다(CLAUDE_USAGE_RETRY 초, 0 이면 끔). 실패를 캐시에
+박아 두면 TTL(기본 5분) 동안 새 셸마다 "조회 실패" 가 그려진다.
+
 의존성 없음(파이썬 표준 라이브러리만).
 """
 from __future__ import annotations
@@ -32,6 +37,7 @@ import hashlib
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 import time
@@ -40,7 +46,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-API = "https://api.anthropic.com"
+API = os.environ.get("CLAUDE_USAGE_API", "https://api.anthropic.com")   # 테스트 시임
 CHATGPT_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"
 UA = "claude-usage/1.0 (dotfiles; local shell status)"
 HOME = os.path.expanduser("~")
@@ -57,6 +63,8 @@ STALE_MAX = int(os.environ.get("CLAUDE_USAGE_STALE_MAX", "86400"))  # 이보다 
 TIMEOUT = float(os.environ.get("CLAUDE_USAGE_TIMEOUT", "8"))
 COLD_TIMEOUT = float(os.environ.get("CLAUDE_USAGE_COLD_TIMEOUT", "4"))
 DEFAULT_STYLE = os.environ.get("CLAUDE_USAGE_STYLE", "bars")
+RETRY_BUDGET = float(os.environ.get("CLAUDE_USAGE_RETRY", "180"))   # 연결 복구 재시도 예산(초), 0이면 끔
+RETRY_DELAYS = (3, 7, 15, 30, 45, 80)                               # 예산을 넘는 간격에서 멈춘다
 
 # ─────────────────────────────────────────── 계정 탐색
 
@@ -235,12 +243,16 @@ def fetch_chatgpt_account(label: str, codex_home: str, timeout: float) -> dict:
     if account_id:
         headers["ChatGPT-Account-Id"] = account_id
     status, body = _http_get(CHATGPT_USAGE_URL, headers, timeout)
+    if status == 0:                                  # 연결이 안 됐다 — 계정이 아니라 이 컴퓨터의 상태다
+        rec["state"] = "offline"
+        rec["error"] = str(body)
+        return rec
     if status in (401, 403):
         rec["state"] = "token_expired"
         return rec
     if status != 200 or not isinstance(body, dict):
         rec["state"] = "error"
-        rec["error"] = f"HTTP {status}" if status else str(body)
+        rec["error"] = f"HTTP {status}"
         return rec
     rec["state"] = "ok"
     rec["rows"] = chatgpt_rows(body)
@@ -311,7 +323,22 @@ def has_creds(config_dir: str) -> bool:
     return _creds(config_dir) is not None
 
 
+def _transport_error(exc: Exception) -> str:
+    """연결 자체가 안 될 때의 이유 — `URLError` 한 덩어리로 뭉뚱그리면 원인을 못 잡는다."""
+    reason = getattr(exc, "reason", None) or exc
+    if isinstance(reason, socket.gaierror):
+        return "DNS 실패"
+    if isinstance(reason, TimeoutError):
+        return "타임아웃"
+    if isinstance(reason, ConnectionError):
+        return "연결 거부"
+    if isinstance(reason, OSError):
+        return (reason.strerror or type(reason).__name__)[:40]
+    return (str(reason) or type(exc).__name__)[:40]
+
+
 def _http_get(url: str, headers: dict, timeout: float) -> tuple[int, object]:
+    """(HTTP 상태, 본문). 상태 0 은 응답을 못 받았다는 뜻 — 본문 자리에 그 이유가 들어온다."""
     req = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -319,7 +346,7 @@ def _http_get(url: str, headers: dict, timeout: float) -> tuple[int, object]:
     except urllib.error.HTTPError as exc:
         return exc.code, None
     except Exception as exc:
-        return 0, type(exc).__name__
+        return 0, _transport_error(exc)
 
 
 def _get(path: str, token: str, timeout: float) -> tuple[int, object]:
@@ -346,12 +373,16 @@ def fetch_account(label: str, config_dir: str, timeout: float) -> dict:
 
     token = oauth.get("accessToken") or ""
     status, usage = _get("/api/oauth/usage", token, timeout)
+    if status == 0:                                  # 연결이 안 됐다 — 계정이 아니라 이 컴퓨터의 상태다
+        rec["state"] = "offline"
+        rec["error"] = str(usage)
+        return rec
     if status in (401, 403):
         rec["state"] = "token_expired"
         return rec
     if status != 200 or not isinstance(usage, dict):
         rec["state"] = "error"
-        rec["error"] = f"HTTP {status}" if status else str(usage)
+        rec["error"] = f"HTTP {status}"
         return rec
 
     rec["state"] = "ok"
@@ -549,6 +580,7 @@ STATE_MSG = {
     "logged_out": ("✗", "미로그인 — `{cmd}` 를 실행해 브라우저 로그인"),
     "token_expired": ("⚠", "토큰 만료 — `{cmd}` 를 한 번 실행하면 갱신됨"),
     "error": ("⚠", "조회 실패 ({err})"),
+    "offline": ("⚠", "네트워크 없음 ({err}) — 연결되면 자동 재시도"),
 }
 
 
@@ -569,10 +601,15 @@ def render(state: dict, style: str, ink: Ink, width: int) -> str:
         return ""
     stamp = state.get("fetched_at", time.time())
     if style == "compact":
-        return render_compact(accounts, stamp, ink, width)
-    if style == "panel":
-        return render_panel(accounts, stamp, ink, width)
-    return render_bars(accounts, stamp, ink, width)
+        text = render_compact(accounts, stamp, ink, width)
+    elif style == "panel":
+        text = render_panel(accounts, stamp, ink, width)
+    else:
+        text = render_bars(accounts, stamp, ink, width)
+    if state.get("offline"):
+        # 숫자는 마지막 성공값이다 — 왜 갱신이 멈췄는지 스타일 공통으로 한 줄 밝힌다.
+        text = f" {ink.red('⚠')} {ink.dim('네트워크 없음 · 아래는 마지막 조회값')}\n" + text
+    return text
 
 
 def render_bars(accounts, stamp, ink, width) -> str:
@@ -755,6 +792,35 @@ def write_renders(state: dict, targets: set[tuple[str, int]]) -> None:
             pass
 
 
+def merge_offline(results: list[dict], prev: dict | None) -> tuple[dict, bool]:
+    """(보여 줄 상태, 캐시에 써도 되는가).
+
+    연결 실패는 계정 상태가 아니라 이 컴퓨터의 상태다. 그걸 캐시에 박으면 TTL(기본 5분) 동안
+    새 셸마다 "조회 실패" 가 그려진다 — 2026-09-20 리부트 직후 첫 셸이 Wi-Fi 결합보다 먼저 떠서
+    네 계정이 한꺼번에 URLError 로 굳었던 사고. 그래서 한 계정도 응답을 못 받았으면 state.json 을
+    아예 건드리지 않고(zsh 는 이 파일의 mtime 으로 신선도를 재므로 다음 셸이 곧바로 다시 갱신한다),
+    일부만 실패했으면 그 계정만 직전 성공값을 들고 간다.
+    """
+    if not any(r.get("state") == "offline" for r in results):
+        return {"fetched_at": time.time(), "accounts": results}, True
+
+    if all(r.get("state") == "offline" for r in results):
+        if prev and prev.get("accounts"):
+            return {**prev, "offline": True, "checked_at": time.time()}, False
+        return {"fetched_at": time.time(), "accounts": results, "offline": True}, False
+
+    old = {(a.get("label"), a.get("dir")): a for a in (prev or {}).get("accounts") or []}
+    stamp = (prev or {}).get("fetched_at")
+    merged = []
+    for rec in results:
+        last = old.get((rec.get("label"), rec.get("dir")))
+        if rec.get("state") == "offline" and last and last.get("state") == "ok":
+            merged.append({**last, "as_of": last.get("as_of") or stamp})
+        else:
+            merged.append(rec)
+    return {"fetched_at": time.time(), "accounts": merged, "offline": True}, True
+
+
 def refresh(timeout: float, targets: set[tuple[str, int]] | None = None) -> dict:
     jobs = [("claude", label, path) for label, path in discover_accounts()]
     jobs += [("chatgpt", label, path) for label, path in discover_chatgpt_accounts()]
@@ -765,10 +831,38 @@ def refresh(timeout: float, targets: set[tuple[str, int]] | None = None) -> dict
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(jobs))) as pool:
         results = list(pool.map(fetch, jobs))
-    state = {"fetched_at": time.time(), "accounts": results}
-    _atomic_write(CACHE_FILE, json.dumps(state, ensure_ascii=False))
-    write_renders(state, (targets or set()) | known_renders())
+    state, cacheable = merge_offline(results, load_cache())
+    if cacheable:
+        _atomic_write(CACHE_FILE, json.dumps(state, ensure_ascii=False))
+        write_renders(state, (targets or set()) | known_renders())
     return state
+
+
+def refresh_until_online(timeout: float, targets: set[tuple[str, int]] | None = None,
+                         keep_lock: bool = False) -> dict:
+    """백그라운드 전용: 연결이 돌아올 때까지 간격을 늘려 가며 다시 조회한다.
+
+    리부트 직후 첫 셸은 Wi-Fi 가 붙기 전에 뜬다. 한 번 실패하고 끝내면 다음 셸을 열 때까지
+    사용량이 빈 채로 남으므로, 예산(RETRY_BUDGET) 안에서 조용히 다시 시도한다.
+    """
+    state = refresh(timeout, targets)
+    spent = 0.0
+    for delay in RETRY_DELAYS:
+        if not state.get("offline") or spent + delay > RETRY_BUDGET:
+            break
+        time.sleep(delay)
+        spent += delay
+        if keep_lock:
+            _touch_lock()          # 기다리는 동안에도 "아직 도는 중" 이어야 다른 셸이 또 띄우지 않는다
+        state = refresh(timeout, targets)
+    return state
+
+
+def _touch_lock() -> None:
+    try:
+        os.utime(LOCK_FILE, None)
+    except OSError:
+        pass
 
 
 def spawn_refresh(style: str, width: int) -> None:
@@ -819,13 +913,17 @@ def main() -> int:
 
     try:
         if args.refresh:
-            state = refresh(TIMEOUT, target)
+            # 재시도는 백그라운드(--quiet)만 — 손으로 부른 `-r` 은 기다리게 하지 않는다.
+            state = (refresh_until_online(TIMEOUT, target, keep_lock=args.unlock) if args.quiet
+                     else refresh(TIMEOUT, target))
         else:
             state = load_cache()
             if not state:
                 state = refresh(COLD_TIMEOUT, target)          # 최초 1회만 잠깐 대기
             elif time.time() - state.get("fetched_at", 0) >= TTL:
                 spawn_refresh(args.style, width)               # 이번엔 캐시로, 다음부터 신선
+            if state.get("offline"):
+                spawn_refresh(args.style, width)               # 연결이 돌아오면 조용히 채워 둔다
     finally:
         if args.unlock:
             try:

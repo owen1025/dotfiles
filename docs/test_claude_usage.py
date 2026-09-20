@@ -92,6 +92,95 @@ class UsageDisplayTests(unittest.TestCase):
         self.assertNotIn("Fable", text)
 
 
+class OfflineCacheTests(unittest.TestCase):
+    """2026-09-20: 리부트 직후 첫 셸이 Wi-Fi 결합보다 먼저 떠 네 계정이 URLError 로 굳었다.
+
+    실패는 캐시를 덮지 않아야 한다 — 덮으면 TTL 동안 새 셸마다 '조회 실패' 가 그려진다.
+    """
+    OFFLINE = {"label": "claude", "dir": "/unused/claude", "kind": "claude",
+               "state": "offline", "error": "DNS 실패"}
+
+    def cached(self, **over):
+        account = copy.deepcopy(ACCOUNT)
+        account.update(label="claude", dir="/unused/claude", **over)
+        return {"fetched_at": 1788962076, "accounts": [account]}
+
+    def test_total_outage_never_touches_the_cache(self):
+        state, cacheable = usage["merge_offline"]([dict(self.OFFLINE)], self.cached())
+        self.assertFalse(cacheable)
+        self.assertTrue(state["offline"])
+        self.assertEqual(state["accounts"][0]["state"], "ok")
+        self.assertEqual(state["fetched_at"], 1788962076)     # 조회 시각을 위조하지 않는다
+
+    def test_cold_outage_is_reported_but_still_not_cached(self):
+        state, cacheable = usage["merge_offline"]([dict(self.OFFLINE)], None)
+        self.assertFalse(cacheable)
+        self.assertIn("네트워크 없음", usage["render"](state, "bars", usage["Ink"](False), 120))
+
+    def test_partial_outage_keeps_the_last_good_row(self):
+        alive = copy.deepcopy(ACCOUNT)
+        results = [dict(self.OFFLINE), alive]
+        state, cacheable = usage["merge_offline"](results, self.cached())
+        self.assertTrue(cacheable)
+        self.assertEqual([a["state"] for a in state["accounts"]], ["ok", "ok"])
+        self.assertEqual(state["accounts"][0]["as_of"], 1788962076)
+
+    def test_success_clears_the_offline_marker(self):
+        state, cacheable = usage["merge_offline"]([copy.deepcopy(ACCOUNT)], self.cached())
+        self.assertTrue(cacheable)
+        self.assertNotIn("offline", state)
+
+    def test_server_errors_are_still_reported_as_failures(self):
+        broken = {"label": "claude", "dir": "/unused/claude", "state": "error", "error": "HTTP 500"}
+        state, cacheable = usage["merge_offline"]([broken], self.cached())
+        self.assertTrue(cacheable)                            # 서버가 답한 실패는 사실이므로 캐시한다
+        self.assertIn("조회 실패 (HTTP 500)", usage["render"](state, "bars", usage["Ink"](False), 120))
+
+    def test_transport_errors_say_what_broke(self):
+        import socket as _socket
+        import urllib.error as _urlerr
+        cases = {_socket.gaierror(8, "nodename nor servname provided"): "DNS 실패",
+                 ConnectionRefusedError(61, "Connection refused"): "연결 거부",
+                 TimeoutError(): "타임아웃"}
+        for reason, expected in cases.items():
+            with self.subTest(expected=expected):
+                self.assertEqual(usage["_transport_error"](_urlerr.URLError(reason)), expected)
+
+    def test_unreachable_api_leaves_the_good_render_in_place(self):
+        """실제 전송 실패를 일으켜(닫힌 포트) 캐시가 그대로인지 끝단에서 확인한다."""
+        import json as _json
+        import socket as _socket
+        with _socket.socket() as probe:                        # 지금 아무도 안 듣는 포트
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cache, config = root / "cache", root / "claude"
+            cache.mkdir(), config.mkdir()
+            (config / ".credentials.json").write_text(_json.dumps(
+                {"claudeAiOauth": {"accessToken": "unused", "expiresAt": (time.time() + 3600) * 1000}}))
+            good = {"fetched_at": time.time() - 60,
+                    "accounts": [{**copy.deepcopy(ACCOUNT), "label": "claude", "dir": str(config)}]}
+            (cache / "state.json").write_text(_json.dumps(good))
+            (cache / "render-bars-120.txt").write_text("GOOD_RENDER\n")
+            before = (cache / "state.json").stat().st_mtime
+            env = {**os.environ, "CLAUDE_USAGE_CACHE": str(cache),
+                   "CLAUDE_USAGE_ACCOUNTS": f"claude:{config}", "CLAUDE_USAGE_CHATGPT": "0",
+                   "CLAUDE_USAGE_API": f"http://127.0.0.1:{port}", "CLAUDE_USAGE_RETRY": "0",
+                   "CLAUDE_USAGE_TIMEOUT": "2", "NO_COLOR": "1"}
+            result = subprocess.run(
+                ["python3", str(ROOT / "private_dot_local/bin/executable_claude-usage"),
+                 "--refresh", "--style", "bars", "--width", "120", "--no-color"],
+                env=env, capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("네트워크 없음", result.stdout)
+            self.assertIn("52%", result.stdout)                # 마지막 성공값은 그대로 보인다
+            self.assertNotIn("조회 실패", result.stdout)
+            self.assertEqual((cache / "render-bars-120.txt").read_text(), "GOOD_RENDER\n")
+            self.assertEqual((cache / "state.json").stat().st_mtime, before)
+            self.assertEqual(_json.loads((cache / "state.json").read_text()), good)
+
+
 class ShellCacheTests(unittest.TestCase):
     def startup(self, age):
         with tempfile.TemporaryDirectory() as directory:
