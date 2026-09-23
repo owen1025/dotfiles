@@ -102,6 +102,36 @@ _claude_wants_color() {
   return 0
 }
 
+# ── 자동 업데이트 킬스위치 가드 ──────────────────────────────────────────────
+# 계정별 `.claude.json` 의 `autoUpdates:false` 는 네이티브 설치에서 `installMethod:"native"` +
+# `autoUpdatesProtectedForNative:true` 가 같이 있을 때만 무해하다(`claude install` 이 레거시
+# 업데이터만 끄고 네이티브 업데이터는 살려 둔 상태). 그런데 npm-global 경로로 업데이트가 한 번
+# 성공하면 installMethod 만 "global" 로 되돌아가고 autoUpdates:false 는 남아 예외가 깨진다
+# → `claude doctor` 가 "Auto-updates: disabled (config)". 세 계정이 바이너리를 공유해서
+# 증상이 안 보인다(2026-09-17 세 계정 동시 발생 → 6일간 2.1.274 고정, 2026-09-23 발견).
+# 그래서 실행 직전에 킬스위치를 아예 지운다. 상세·수동 진단은
+# `claude-autoupdate-guard --check` 와 그 스크립트 docstring.
+#   끄기: CLAUDE_AUTOUPDATE_GUARD=0   (버전을 일부러 핀 해 둔 머신)
+_claude_autoupdate_guard() {
+  emulate -L zsh
+  [[ ${CLAUDE_AUTOUPDATE_GUARD:-1} == 1 ]] || return 0
+  local dir=${1:-$HOME/.claude} file
+  # 설정 파일 위치는 CLI 규칙 그대로: <configdir>/.config.json 이 있으면 그것, 없으면
+  # <CLAUDE_CONFIG_DIR>/.claude.json — 기본 계정은 CLAUDE_CONFIG_DIR 이 비어 있어 ~/.claude.json.
+  if [[ -f $dir/.config.json ]]; then
+    file=$dir/.config.json
+  elif [[ $dir == "$HOME/.claude" ]]; then
+    file=$HOME/.claude.json
+  else
+    file=$dir/.claude.json
+  fi
+  # 킬스위치가 없으면 여기서 끝난다 — grep 한 번이라 실행 지연이 사실상 0이다.
+  [[ -w $file ]] || return 0
+  command grep -q '"autoUpdates"[[:space:]]*:[[:space:]]*false' -- "$file" 2>/dev/null || return 0
+  command -v claude-autoupdate-guard >/dev/null 2>&1 || return 0
+  command claude-autoupdate-guard --quiet -- "$file"
+}
+
 # claude / claude2 공통 진입점. $1 = CLAUDE_CONFIG_DIR (없으면 기본 계정)
 _claude_launch() {
   emulate -L zsh
@@ -113,6 +143,7 @@ _claude_launch() {
     print -u2 "claude: PATH 에 실행파일이 없다 (설치/업데이트 중일 수 있다). 잠시 뒤 다시 시도할 것."
     return 127
   fi
+  _claude_autoupdate_guard "$cfg"
   local -a args=("$@")
   local color='' REPLY=''
   if _claude_wants_color "$@" && _claude_pick_color && [[ -n $REPLY ]]; then

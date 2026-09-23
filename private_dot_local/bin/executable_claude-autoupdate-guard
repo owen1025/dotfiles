@@ -1,0 +1,175 @@
+#!/usr/bin/env python3
+"""claude-autoupdate-guard — Claude Code 자동 업데이트 킬스위치를 풀어 둔다.
+
+Claude Code 의 업데이트 킬스위치는 계정별 전역 설정(`~/.claude.json`,
+보조 계정은 `<CLAUDE_CONFIG_DIR>/.claude.json`)의 `autoUpdates: false` 다.
+네이티브 설치만 예외를 받는데, 그 예외 조건이 세 키의 조합이다:
+
+    autoUpdates:false + installMethod:"native" + autoUpdatesProtectedForNative:true
+      → 업데이트 켜짐 (`claude install` 이 레거시 업데이터만 끄고 네이티브 업데이터는 살린 상태)
+    autoUpdates:false + installMethod:"native" 아님
+      → 업데이트 꺼짐 (`claude doctor` 가 "Auto-updates: disabled (config)")
+
+문제는 세 키를 쓰는 주체가 다르다는 것이다. `claude install`(네이티브)이 셋을 한꺼번에 쓰지만,
+그 뒤 **npm-global 경로로 업데이트가 한 번 성공하면 installMethod 만 "global" 로 되돌아간다**.
+`autoUpdates:false` 는 그대로 남으므로 예외가 깨지고, 그 순간부터 조용히 업데이트가 멈춘다.
+
+실측(2026-09-17): claude·claude2·claude3 세 계정 모두 npm-global 로 2.1.274 를 받은 뒤
+installMethod 가 "global" 로 덮여 6일간 업데이트가 멈췄다. 계정 A 는 2026-09-23 에 손으로
+`claude install` 을 돌리다 우연히 풀렸고, B·C 는 계속 멈춰 있었다. 증상이 조용해서
+(세 계정이 같은 바이너리를 공유하고, 한 계정이라도 업데이트하면 다 같이 올라간다)
+아무도 안 쓰는 계정만 남으면 버전이 통째로 굳는다.
+
+그래서 네이티브 설치를 쓰는 머신에서는 `autoUpdates:false` 자체를 지운다. 키가 없으면 기본값이
+"켜짐" 이라 installMethod 가 뭐로 덮이든 킬스위치가 다시 잠기지 않는다.
+`autoUpdatesProtectedForNative:true` 는 남겨 둔다 — 누군가 autoUpdates:false 를 다시 넣어도
+(a) 네이티브 예외가 바로 먹고 (b) CLI 의 마이그레이션이 공유 settings.json 에
+`env.DISABLE_AUTOUPDATER=1` 을 박아 세 계정을 한꺼번에 끄는 일을 막는다.
+
+  claude-autoupdate-guard              계정 자동 발견 후 필요한 곳만 고친다
+  claude-autoupdate-guard --check      고치지 않고 진단만 (킬스위치가 있으면 exit 1)
+  claude-autoupdate-guard <파일|디렉터리> ...   대상 지정
+  --force                              네이티브 설치가 아니어도 실행 (버전 핀 머신에서는 쓰지 말 것)
+
+npm-global·Homebrew 설치 머신에서는 아무것도 하지 않는다 (`--force` 제외): 그쪽의
+`autoUpdates:false` 는 대개 깨진 릴리스를 피하려고 일부러 박아 둔 핀이다.
+
+의존성 없음(파이썬 표준 라이브러리만).
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import shutil
+import stat
+import sys
+import tempfile
+
+HOME = os.path.expanduser("~")
+NATIVE_MARK = os.path.join("share", "claude", "versions")
+BACKUP_SUFFIX = ".bak.autoupdate-guard"
+
+
+def native_claude() -> str | None:
+    """PATH 의 claude 가 네이티브 설치면 그 실제 경로, 아니면 None."""
+    exe = shutil.which("claude")
+    if not exe:
+        return None
+    real = os.path.realpath(exe)
+    return real if NATIVE_MARK in real else None
+
+
+def config_file(config_dir: str) -> str:
+    """CLAUDE_CONFIG_DIR 하나에 대응하는 전역 설정 파일 경로.
+
+    CLI 의 규칙 그대로다: `<configdir>/.config.json` 이 있으면 그것, 없으면
+    `<CLAUDE_CONFIG_DIR>/.claude.json` — 단 기본 계정은 CLAUDE_CONFIG_DIR 이 비어 있어서
+    `~/.claude/.claude.json` 이 아니라 `~/.claude.json` 이다.
+    """
+    dotted = os.path.join(config_dir, ".config.json")
+    if os.path.isfile(dotted):
+        return dotted
+    if os.path.realpath(config_dir) == os.path.realpath(os.path.join(HOME, ".claude")):
+        return os.path.join(HOME, ".claude.json")
+    return os.path.join(config_dir, ".claude.json")
+
+
+def discover() -> list[str]:
+    """기본 계정 + `~/.claude-*` 보조 계정의 설정 파일들 (claude-usage 와 같은 발견 규칙)."""
+    dirs = [os.path.join(HOME, ".claude")]
+    try:
+        names = sorted(os.listdir(HOME))
+    except OSError:
+        names = []
+    for name in names:
+        if name.startswith(".claude-") and os.path.isdir(os.path.join(HOME, name)):
+            dirs.append(os.path.join(HOME, name))
+    out: list[str] = []
+    for d in dirs:
+        path = config_file(d)
+        if path not in out:
+            out.append(path)
+    return out
+
+
+def write_atomic(path: str, data: dict) -> None:
+    """심링크를 일반 파일로 바꿔치지 않고(=계정 공유를 끊지 않고) 원자적으로 쓴다."""
+    real = os.path.realpath(path)
+    mode = stat.S_IMODE(os.stat(real).st_mode)
+    shutil.copy2(real, real + BACKUP_SUFFIX)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(real) or ".", prefix=".claude.json.guard-")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            # CLI 가 쓰는 모양 그대로 (indent=2, 끝에 개행 없음)
+            json.dump(data, fh, indent=2, ensure_ascii=False)
+        os.chmod(tmp, mode)
+        os.replace(tmp, real)
+    except BaseException:
+        os.unlink(tmp)
+        raise
+
+
+def handle(path: str, check: bool) -> str | None:
+    """킬스위치가 걸려 있으면 고치고(또는 진단하고) 한 줄 보고, 아니면 None."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            cfg = json.load(fh)
+        if not isinstance(cfg, dict):
+            raise ValueError("최상위가 JSON 객체가 아니다")
+    except FileNotFoundError:
+        return None
+    except Exception as exc:  # 깨진 설정을 덮어쓰지 않는다
+        print(f"WARN: {path} 를 읽지 못해 건너뛴다 ({exc})", file=sys.stderr)
+        return None
+
+    if cfg.get("autoUpdates") is not False:
+        return None
+
+    method = cfg.get("installMethod")
+    if check:
+        state = "네이티브 예외로 아직 켜져 있음" if (
+            method == "native" and cfg.get("autoUpdatesProtectedForNative") is True
+        ) else "꺼짐"
+        return f"[trap] {path} — autoUpdates=false, installMethod={method!r} → 업데이트 {state}"
+
+    cfg.pop("autoUpdates", None)
+    cfg["installMethod"] = "native"
+    cfg["autoUpdatesProtectedForNative"] = True
+    write_atomic(path, cfg)
+    return (f"[fix] {path} — autoUpdates 킬스위치 제거 · installMethod={method!r}→'native' "
+            f"(이전 파일: {os.path.realpath(path) + BACKUP_SUFFIX})")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(
+        description="Claude Code 전역 설정에서 자동 업데이트 킬스위치를 풀어 둔다")
+    ap.add_argument("targets", nargs="*",
+                    help="설정 파일 또는 CLAUDE_CONFIG_DIR (생략하면 계정 자동 발견)")
+    ap.add_argument("--check", action="store_true", help="고치지 않고 진단만 (걸려 있으면 exit 1)")
+    ap.add_argument("--force", action="store_true", help="네이티브 설치가 아니어도 실행")
+    ap.add_argument("-q", "--quiet", action="store_true", help="고칠 게 없으면 아무것도 찍지 않는다")
+    args = ap.parse_args()
+
+    if not args.force and not native_claude():
+        if not args.quiet:
+            print("네이티브 설치(~/.local/share/claude/versions/…)가 아니라 건너뛴다 "
+                  "— 의도적인 버전 핀일 수 있다. 강제하려면 --force", file=sys.stderr)
+        return 0
+
+    targets = [os.path.expanduser(t) for t in args.targets] or discover()
+    paths = [config_file(t) if os.path.isdir(t) else t for t in targets]
+
+    # 셸 래퍼가 claude 실행 직전에 부르므로 보고는 전부 stderr 로 — stdout 은 비워 둔다.
+    hits = [msg for msg in (handle(p, args.check) for p in paths) if msg]
+    for msg in hits:
+        print(msg, file=sys.stderr)
+    if hits and not args.check:
+        print("실행 중인 세션은 재시작해야 적용된다.", file=sys.stderr)
+    if not hits and not args.quiet:
+        print(f"[ok] 킬스위치 없음 ({len(paths)}개 계정)", file=sys.stderr)
+    return 1 if (hits and args.check) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
