@@ -1,7 +1,7 @@
 {{ if eq .chezmoi.os "darwin" -}}
 #!/bin/bash
 # chrome-automation-gc LaunchAgent 를 (다시) 올린다 — plist·스크립트가 바뀔 때마다 실행.
-# plist hash: {{ include "private_Library/LaunchAgents/com.owen.chrome-automation-gc.plist.tmpl" | sha256sum }}
+# plist hash: {{ include "private_Library/private_LaunchAgents/com.owen.chrome-automation-gc.plist.tmpl" | sha256sum }}
 # script hash: {{ include "private_dot_local/bin/executable_chrome-automation-gc" | sha256sum }}
 set -euo pipefail
 
