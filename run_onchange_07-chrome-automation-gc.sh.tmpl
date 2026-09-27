@@ -1,0 +1,15 @@
+{{ if eq .chezmoi.os "darwin" -}}
+#!/bin/bash
+# chrome-automation-gc LaunchAgent 를 (다시) 올린다 — plist·스크립트가 바뀔 때마다 실행.
+# plist hash: {{ include "private_Library/LaunchAgents/com.owen.chrome-automation-gc.plist.tmpl" | sha256sum }}
+# script hash: {{ include "private_dot_local/bin/executable_chrome-automation-gc" | sha256sum }}
+set -euo pipefail
+
+LABEL=com.owen.chrome-automation-gc
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+[[ -f $PLIST ]] || { echo "WARN: $PLIST 가 없다 — chezmoi apply 순서 확인" >&2; exit 0; }
+
+launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$PLIST"
+echo "chrome-automation-gc: launchd 등록 (1시간마다, 로그 ~/Library/Logs/chrome-automation-gc.log)"
+{{ end -}}

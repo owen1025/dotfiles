@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# chrome-automation-gc — 자동화 도구가 버리고 간 Chrome 임시 프로필(user-data-dir)을 치운다.
+#
+# 왜 쌓이나 (2026-09-27 실측, 여유 공간 5.1G 까지 떨어짐):
+#   puppeteer 는 userDataDir 없이 launch 하면 $TMPDIR/puppeteer_dev_chrome_profile-XXXXXX 를
+#   새로 만들고 browser.close() 때만 지운다. hyperframes(render·capture·snapshot)가 이 경로를
+#   쓰는데, Claude 세션의 Bash 타임아웃·중단·세션 종료는 node 를 SIGKILL 로 끝내므로 close()
+#   가 돌지 않고 프로필(3~66M, Chrome 컴포넌트 캐시 포함)이 그대로 남는다. 세션이 즉석에서
+#   짠 CDP/헤드리스 스크립트(/tmp/chprof_*, $TMPDIR/shoot-* 등)도 똑같이 남긴다.
+#   macOS 의 03:35 dirhelper 청소는 3일 넘게 안 건드린 파일만 지우고 디렉토리 뼈대는 남겨서
+#   당일·전날 것은 그대로 쌓인다.
+#
+# 무엇을 지우나: $TMPDIR 와 /private/tmp 아래(깊이 6 이내)에서
+#   - 이름이 puppeteer_dev_chrome_profile-* / puppeteer_dev_profile-* /
+#     playwright_chromiumdev_profile-* 인 디렉토리, 또는
+#   - `Local State` 파일을 가진 디렉토리(= Chrome user-data-dir)
+#   중 아래를 모두 만족하는 것만:
+#   - 실행 중인 프로세스의 명령줄에 그 이름이 없다 (--user-data-dir=… 로 쓰는 중이 아님)
+#   - SingletonLock 이 가리키는 PID 가 살아 있지 않다 (Chrome 자신의 사용 중 표식)
+#   - IDLE_MIN 분 동안 안쪽(깊이 2)이 수정되지 않았다
+# 임시 디렉토리 밖(실사용 Chrome 프로필, ~/.cache/chrome-devtools-mcp 의 영구 프로필)은 보지 않는다.
+#
+#   chrome-automation-gc            지우고 요약 한 줄
+#   chrome-automation-gc -n         지우지 않고 대상만 출력 (dry-run)
+#   CHROME_GC_IDLE_MIN=60           유휴 기준(분), 기본 60
+#
+# 스케줄: launchd com.owen.chrome-automation-gc (1시간마다, ~/Library/LaunchAgents).
+# 로그: ~/Library/Logs/chrome-automation-gc.log
+set -uo pipefail
+
+IDLE_MIN="${CHROME_GC_IDLE_MIN:-60}"
+DRY=0
+case "${1:-}" in
+	-n | --dry-run) DRY=1 ;;
+	"") ;;
+	-h | --help)
+		sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'
+		exit 0
+		;;
+	*)
+		echo "usage: chrome-automation-gc [-n|--dry-run]" >&2
+		exit 2
+		;;
+esac
+
+roots=()
+for r in "${TMPDIR:-}" /private/tmp; do
+	[[ -n $r && -d $r ]] || continue
+	r="$(cd "$r" && pwd -P)"
+	[[ " ${roots[*]-} " == *" $r "* ]] || roots+=("$r")
+done
+[[ ${#roots[@]} -gt 0 ]] || exit 0
+
+cmdlines="$(ps -axww -o command= 2>/dev/null)"
+
+in_use() {
+	local d=$1 name lock pid
+	name="$(basename "$d")"
+	grep -qF -- "$name" <<<"$cmdlines" && return 0
+	if lock="$(readlink "$d/SingletonLock" 2>/dev/null)"; then
+		pid="${lock##*-}"
+		[[ $pid =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null && return 0
+	fi
+	[[ -n "$(find "$d" -maxdepth 2 -mmin "-$IDLE_MIN" -print -quit 2>/dev/null)" ]] && return 0
+	return 1
+}
+
+under_root() {
+	local d=$1 r
+	for r in "${roots[@]}"; do
+		[[ $d == "$r"/* ]] && return 0
+	done
+	return 1
+}
+
+candidates="$(
+	for r in "${roots[@]}"; do
+		find "$r" -maxdepth 1 -type d \( -name 'puppeteer_dev_chrome_profile-*' \
+			-o -name 'puppeteer_dev_profile-*' -o -name 'playwright_chromiumdev_profile-*' \) \
+			-user "$(id -u)" 2>/dev/null
+		find "$r" -maxdepth 6 \( -name node_modules -o -name .git \) -prune -o \
+			-name 'Local State' -type f -user "$(id -u)" -print 2>/dev/null |
+			sed 's#/Local State$##'
+	done | sort -u
+)"
+
+removed=0
+freed_kb=0
+kept=0
+while IFS= read -r d; do
+	[[ -n $d && -d $d ]] || continue
+	d="$(cd "$d" && pwd -P)" || continue
+	under_root "$d" || continue
+	if in_use "$d"; then
+		kept=$((kept + 1))
+		[[ $DRY -eq 1 ]] && echo "keep   $d (사용 중/최근 수정)"
+		continue
+	fi
+	kb="$(du -sk "$d" 2>/dev/null | cut -f1)"
+	kb="${kb:-0}"
+	if [[ $DRY -eq 1 ]]; then
+		printf 'remove %s (%sM)\n' "$d" "$((kb / 1024))"
+	else
+		rm -rf -- "$d" 2>/dev/null
+		[[ -e $d ]] && continue
+	fi
+	removed=$((removed + 1))
+	freed_kb=$((freed_kb + kb))
+done <<<"$candidates"
+
+summary="$(date '+%F %T') removed=$removed freed=$((freed_kb / 1024))M kept=$kept idle_min=$IDLE_MIN"
+if [[ $DRY -eq 1 ]]; then
+	echo "(dry-run) $summary"
+else
+	echo "$summary"
+fi
