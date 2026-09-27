@@ -5,7 +5,7 @@
 #                                      최초 1회 `claude3` 실행 = 브라우저 로그인)
 #   새 계정 추가 = 아래 `claude4() { _claude_alt "$HOME/.claude-d" "$@" }` 한 줄.
 #
-# 공유(심링크): projects(세션 트랜스크립트 + 자동 메모리) · file-history · skills · plugins · settings.json
+# 공유(심링크): projects(세션 트랜스크립트 + 자동 메모리) · file-history · skills · plugins · settings.json · CLAUDE.md
 # 격리(계정별): 크레덴셜 · <configdir>/.claude.json · history.jsonl
 #   (크레덴셜은 macOS 에선 키체인 `Claude Code-credentials-<sha256(configdir)[:8]>`, 그 외 OS 는 .credentials.json.
 #    셸 시작 패널(claude-usage)도 같은 곳을 읽으므로 파일이 없어도 "미로그인" 으로 뜨지 않는다.)
@@ -164,12 +164,12 @@ _claude_launch() {
 claude() { _claude_launch '' "$@" }
 
 # 보조 계정 공통 진입점. $1 = 그 계정의 CLAUDE_CONFIG_DIR. 디렉터리가 없으면 만들고
-# (첫 실행 = 온보딩 + 로그인), 공유 심링크 5개를 호출마다 확인한다.
+# (첫 실행 = 온보딩 + 로그인), 공유 심링크 6개를 호출마다 확인한다.
 _claude_alt() {
   emulate -L zsh
   local b=$1 d; shift
   mkdir -p -- "$b"
-  for d in projects file-history skills plugins settings.json; do
+  for d in projects file-history skills plugins settings.json CLAUDE.md; do
     if [[ -L $b/$d ]]; then
       continue
     elif [[ -e $b/$d ]]; then
