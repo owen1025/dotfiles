@@ -1,0 +1,277 @@
+#!/usr/bin/env python3
+"""claude-permission-hook — auto mode 가 끝내 사람에게 넘기는 권한 프롬프트를 대신 답한다.
+
+Claude Code `PermissionRequest` 훅이다. 권한 대화상자가 뜨기 직전(또는 헤드리스에서 자동 거부되기
+직전)에만 불리고, 평소 도구 호출에는 끼지 않는다. 판정은 셋 중 하나다.
+
+  allow     진짜 위험한 게 아니면 승인 — 대화상자가 뜨지 않는다
+  (무응답)  진짜 위험한 것 · 사람이 답해야 하는 도구 · 분류기 폴백 — 원래 대화상자 그대로
+  (deny 는 쓰지 않는다 — 막는 건 auto mode 분류기와 deny 규칙의 몫이다)
+
+왜 필요한가 (2026-09-27 실측):
+  claude2·claude3 의 `~/.claude-{b,c}/projects` 는 `~/.claude/projects` 로 가는 심링크다
+  (`dot_claude-accounts.zsh`). 그래서 그 계정 세션의 메모리·tool-results 경로는 겉 경로
+  (`.claude-b/…`)는 평범한데 실제 경로는 보호 경로(`.claude/…`)다. Claude Code 는 이를
+  "심링크로 가린 민감 경로" 로 보고 분류기 승인을 막는다(classifierApprovable:false) — auto mode
+  여도, `permissions.allow` 에 Edit 규칙이 있어도 매번 프롬프트가 뜬다(안전 검사가 allow 규칙보다
+  먼저 돈다). 09-20~09-27 알림 로그의 권한 프롬프트 33건 중 14건이 이 메모리 쓰기였다.
+  이 모양의 프롬프트를 답할 수 있는 건 PermissionRequest 훅뿐이다.
+
+진짜 위험(= 무응답으로 사람에게 넘김):
+  - rm -r/rmdir/find -delete, git 강제 푸시·reset --hard·clean -f·branch -D·stash drop, sudo,
+    디스크·전원·launchctl bootout, curl|sh, 키체인, DROP/TRUNCATE, terraform/kubectl/helm 파괴,
+    프로덕션 배포(wrangler deploy · vercel --prod · deploy_web.py)
+  - 셸 rc·~/.ssh·~/.aws 등 자격증명, .git 내부, Claude 설정·훅·플러그인·.mcp.json(자기 권한 확장),
+    세션 트랜스크립트 .jsonl, 시스템 경로, hermes 대시보드 data·wiki(손편집 금지 가드레일)
+  - AskUserQuestion · ExitPlanMode · EnterPlanMode — 사람이 답하라고 있는 도구
+  - 분류기 폴백: auto mode 분류기가 연속 3번(또는 세션 누적 20번) 막으면 Claude Code 가 그 동작을
+    사람에게 묻는다. 트랜스크립트에 직전 연속 거부가 2건 이상(또는 누적 19건 이상)이면 이 프롬프트를
+    그 폴백으로 보고 답하지 않는다 — 분류기가 막은 걸 훅이 뒤집지 않게.
+
+  끄기           CLAUDE_PERMISSION_HOOK=0
+  판정 기록      ~/.local/state/claude-permission-hook/decisions.log  (2MB 넘으면 뒤 절반만 남김)
+  직접 판정      echo '{"hook_event_name":"PermissionRequest","tool_name":"Bash",
+                        "tool_input":{"command":"rm -rf /"}}' | claude-permission-hook --explain
+
+어떤 오류가 나도 무응답(= 원래 대화상자)으로 끝난다 — 실패가 승인으로 새지 않는다.
+의존성 없음(파이썬 표준 라이브러리만).
+"""
+from __future__ import annotations
+
+import datetime as _dt
+import json
+import os
+import re
+import sys
+from pathlib import Path
+
+HOME = str(Path.home())
+STATE_DIR = Path(os.environ.get("XDG_STATE_HOME") or Path(HOME, ".local/state")) / "claude-permission-hook"
+LOG = STATE_DIR / "decisions.log"
+LOG_MAX = 2 * 1024 * 1024
+
+# 사람이 답하라고 있는 도구 — 훅이 대신 답하지 않는다.
+HUMAN_TOOLS = {"AskUserQuestion", "ExitPlanMode", "EnterPlanMode"}
+SHELL_TOOLS = {"Bash", "PowerShell", "Monitor"}
+WRITE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+
+DENIAL_MARKERS = (
+    "Permission for this action was denied by the Claude Code auto mode classifier",
+    "Auto mode could not evaluate this action and is blocking it for safety",
+)
+FALLBACK_CONSECUTIVE = 2   # Claude Code 는 3번째 연속 거부에서 사람에게 묻는다
+FALLBACK_TOTAL = 19        # … 또는 세션 누적 20번째에서
+TRANSCRIPT_TAIL = 4 * 1024 * 1024
+
+# 한 단순 명령 안에서만 본다(파이프·;·&&·줄바꿈을 넘지 않는다).
+_S = r"[^|;&\n]*"
+DANGEROUS_SHELL = [
+    ("rm -r", rf"\brm\b{_S}\s(-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)\b"),
+    ("rmdir", r"\brmdir\b"),
+    ("find -delete", rf"\bfind\b{_S}\s(-delete\b|-exec\s+rm\b)"),
+    ("sudo", r"(^|[\s;&|(`])(sudo|doas)\s"),
+    ("git force push", rf"\bgit\b{_S}\bpush\b{_S}(\s--force(-with-lease)?\b|\s-[a-zA-Z]*f\b|\s--mirror\b|\s--delete\b|\s-d\b|\s\+[^\s]|\s:[^\s])"),
+    ("git reset --hard", rf"\bgit\b{_S}\breset\b{_S}\s--hard\b"),
+    ("git clean -f", rf"\bgit\b{_S}\bclean\b{_S}\s-[a-zA-Z]*f"),
+    ("git branch -D", rf"\bgit\b{_S}\bbranch\b{_S}\s-D\b"),
+    ("git discard tree", rf"\bgit\b{_S}\b(checkout|restore)\b{_S}\s(--\s+)?\.(\s|$)"),
+    ("git stash drop", rf"\bgit\b{_S}\bstash\s+(drop|clear)\b"),
+    ("git history rewrite", rf"\bgit\b{_S}\b(filter-branch|filter-repo|update-ref\s+-d)\b"),
+    ("gh destructive", rf"\bgh\s+(repo\s+(delete|archive)|release\s+delete|secret\s+(set|delete)|api\b{_S}(-X|--method)\s*(DELETE|PUT|PATCH))\b"),
+    ("disk", r"\b(mkfs\w*|newfs\w*|fdisk|diskutil\s+(erase\w*|reformat|partition\w*|zero\w*|secureErase|apfs\s+delete\w*))\b"),
+    ("dd of=/dev", rf"\bdd\b{_S}\bof=/dev/"),
+    ("power", r"(^|[\s;&|(`])(shutdown|reboot|halt|poweroff)\b"),
+    ("launchctl stop", r"\blaunchctl\s+(bootout|unload|remove|disable)\b"),
+    ("kill all", r"\b(killall|pkill)\b|\bkill\s+-9\s+-1\b"),
+    ("crontab -r", r"\bcrontab\s+-r\b"),
+    ("recursive chmod/chown", rf"\b(chmod|chown)\b{_S}\s-R\b"),
+    ("pipe to shell", r"\b(curl|wget)\b[^|;\n]*\|\s*(sudo\s+)?(ba|z|da|k)?sh\b"),
+    ("keychain", r"\bsecurity\s+(delete|add|set|import)-[\w-]+"),
+    ("sql destroy", r"(?i)\b(drop|truncate)\s+(table|database|schema)\b"),
+    ("infra destroy", rf"\b(terraform|tofu)\s+(apply|destroy)\b|\bkubectl\s+(delete|drain|cordon)\b|\bhelm\s+(uninstall|delete)\b"),
+    ("prod deploy", rf"\bwrangler\s+(deploy|publish|delete)\b|\bvercel\b{_S}--prod\b|\bdeploy_web\.py\b"),
+    ("docker prune", r"\bdocker\s+(system\s+prune|volume\s+(rm|prune)|rm\s+-f)\b"),
+]
+# 이 경로로 리다이렉트하거나, 이 경로가 나오는 명령에 쓰기 동작(리다이렉트 제외)이 있으면 위험.
+# `2>/dev/null` 이 붙은 단순 읽기까지 걸리지 않게 리다이렉트는 대상 경로와 붙여서 본다.
+SHELL_WRITE_OPS = r"(\btee\b|\bsed\s+(-[a-zA-Z]*\s+)*-i|\bmv\b|\bcp\b|\brm\b|\brsync\b|\btruncate\b|\bln\b|\bchmod\b|\bdd\b|\bperl\s+-[a-zA-Z]*i)"
+SHELL_REDIRECT = r">{1,2}\|?\s*['\"]?[^\s'\";&|]*"
+DANGEROUS_SHELL_TARGETS = [
+    ("hermes data/wiki", r"\.hermes/profiles/studio/(dashboard/data|wiki)\b"),
+    ("claude settings", r"\.claude[\w.-]*/(settings(\.local)?\.json|hooks/|plugins/)|\.claude\.json\b|managed-settings\.json|\.mcp\.json\b"),
+    ("session transcript", r"\.claude[\w.-]*/projects/\S*\.jsonl\b"),
+    ("shell rc", r"(^|[\s/'\"=])\.(zshrc|zprofile|zshenv|zlogin|bashrc|bash_profile|bash_login|profile|envrc)\b"),
+    ("credentials", r"(~|\$HOME|/Users/[^/\s]+|/home/[^/\s]+)/\.(ssh|aws|gnupg|kube|netrc|docker/config\.json)\b"),
+]
+
+_HOME_RE = re.escape(HOME)
+DANGEROUS_WRITE_PATHS = [
+    ("hermes data/wiki", r"/\.hermes/profiles/studio/(dashboard/data|wiki)(/|$)"),
+    ("claude settings", r"/\.claude[\w.-]*/(settings(\.local)?\.json|hooks/|plugins/|keychain)|/\.claude\.json$|/managed-settings\.json$|/\.mcp\.json$"),
+    ("session transcript", r"/\.claude[\w.-]*/projects/.*\.jsonl$"),
+    ("git internals", r"/\.git(/|$)"),
+    ("shell rc", r"/\.(zshrc|zprofile|zshenv|zlogin|zlogout|bashrc|bash_profile|bash_login|bash_logout|profile|envrc)$"),
+    ("credentials", rf"^{_HOME_RE}/\.(ssh|aws|gnupg|kube)(/|$)|^{_HOME_RE}/\.(netrc|docker/config\.json)$|^{_HOME_RE}/\.config/gh/hosts\.yml$"),
+    ("system path", r"^/(etc|private/etc|System|Library|usr|bin|sbin|opt/homebrew/bin)(/|$)"),
+]
+DANGEROUS_MCP = r"(delete|remove|destroy|drop|purge|revoke|transfer|payment|purchase)"
+
+
+def _first_hit(rules, text):
+    for name, pattern in rules:
+        if re.search(pattern, text):
+            return name
+    return None
+
+
+def _norm_path(p: str) -> str:
+    p = os.path.expanduser(p.strip())
+    return os.path.normpath(p) if p else p
+
+
+def danger(tool: str, tool_input: dict) -> str | None:
+    """진짜 위험하면 이유 문자열, 아니면 None."""
+    if tool in SHELL_TOOLS:
+        cmd = str(tool_input.get("command") or "")
+        hit = _first_hit(DANGEROUS_SHELL, cmd)
+        if hit:
+            return hit
+        writes = re.search(SHELL_WRITE_OPS, cmd) is not None
+        for name, pattern in DANGEROUS_SHELL_TARGETS:
+            if re.search(SHELL_REDIRECT + "(" + pattern + ")", cmd) or (writes and re.search(pattern, cmd)):
+                return f"shell write to {name}"
+        return None
+    if tool in WRITE_TOOLS:
+        path = _norm_path(str(tool_input.get("file_path") or tool_input.get("notebook_path") or ""))
+        if not path:
+            return "write without path"
+        hit = _first_hit(DANGEROUS_WRITE_PATHS, path)
+        return f"write to {hit}" if hit else None
+    if tool.startswith("mcp__"):
+        return "destructive MCP tool" if re.search(DANGEROUS_MCP, tool, re.I) else None
+    return None
+
+
+def _tool_result_texts(entry: dict):
+    msg = entry.get("message") or {}
+    content = msg.get("content")
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "tool_result":
+            c = block.get("content")
+            if isinstance(c, list):
+                c = " ".join(x.get("text", "") for x in c if isinstance(x, dict))
+            yield str(c or "")
+
+
+def classifier_denials(transcript_path: str | None) -> tuple[int, int]:
+    """(직전 연속 분류기 거부 수, 세션 누적 거부 수). 읽을 수 없으면 (0, 0)."""
+    if not transcript_path:
+        return 0, 0
+    try:
+        with open(transcript_path, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            f.seek(max(0, size - TRANSCRIPT_TAIL))
+            raw = f.read().decode("utf-8", errors="replace")
+    except OSError:
+        return 0, 0
+    results: list[bool] = []
+    for line in raw.splitlines():
+        if '"tool_result"' not in line:
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        for text in _tool_result_texts(entry):
+            results.append(text.lstrip().startswith(DENIAL_MARKERS))
+    consecutive = 0
+    for denied in reversed(results):
+        if not denied:
+            break
+        consecutive += 1
+    return consecutive, sum(results)
+
+
+def decide(data: dict) -> tuple[str, str]:
+    """('allow' | 'pass', 이유)."""
+    tool = str(data.get("tool_name") or "")
+    tool_input = data.get("tool_input") if isinstance(data.get("tool_input"), dict) else {}
+    if not tool:
+        return "pass", "no tool name"
+    if tool in HUMAN_TOOLS:
+        return "pass", "human-answered tool"
+    reason = danger(tool, tool_input)
+    if reason:
+        return "pass", f"dangerous: {reason}"
+    if data.get("permission_mode") == "auto":
+        consecutive, total = classifier_denials(data.get("transcript_path"))
+        if consecutive >= FALLBACK_CONSECUTIVE or total >= FALLBACK_TOTAL:
+            return "pass", f"classifier fallback (consecutive={consecutive}, total={total})"
+    return "allow", "not dangerous"
+
+
+def _summary(tool: str, tool_input: dict) -> str:
+    if tool in SHELL_TOOLS:
+        s = str(tool_input.get("command") or "")
+    elif tool in WRITE_TOOLS:
+        s = str(tool_input.get("file_path") or tool_input.get("notebook_path") or "")
+    else:
+        s = json.dumps(tool_input, ensure_ascii=False)
+    s = " ".join(s.split())
+    return s[:200] + ("…" if len(s) > 200 else "")
+
+
+def log(data: dict, verdict: str, reason: str) -> None:
+    try:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        if LOG.exists() and LOG.stat().st_size > LOG_MAX:
+            keep = LOG.read_bytes()[-LOG_MAX // 2:]
+            LOG.write_bytes(keep[keep.find(b"\n") + 1:])
+        tool = str(data.get("tool_name") or "?")
+        tool_input = data.get("tool_input") if isinstance(data.get("tool_input"), dict) else {}
+        line = "\t".join([
+            _dt.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S%z"),
+            str(data.get("session_id") or "-")[:8],
+            str(data.get("permission_mode") or "-"),
+            verdict,
+            tool,
+            reason,
+            _summary(tool, tool_input),
+            str(data.get("cwd") or "").replace(HOME, "~"),
+        ])
+        with open(LOG, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except OSError:
+        pass
+
+
+def main(argv: list[str]) -> int:
+    explain = "--explain" in argv
+    if os.environ.get("CLAUDE_PERMISSION_HOOK", "1") == "0" and not explain:
+        return 0
+    try:
+        data = json.loads(sys.stdin.read() or "{}")
+        if not isinstance(data, dict) or data.get("hook_event_name", "PermissionRequest") != "PermissionRequest":
+            return 0
+        verdict, reason = decide(data)
+    except Exception as e:  # 어떤 실패도 승인으로 새지 않게 — 원래 대화상자로
+        if explain:
+            print(f"error: {e!r}", file=sys.stderr)
+        return 0
+    if explain:
+        print(f"{verdict}\t{reason}")
+        return 0
+    log(data, verdict, reason)
+    if verdict == "allow":
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PermissionRequest",
+            "decision": {"behavior": "allow"},
+        }}))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
