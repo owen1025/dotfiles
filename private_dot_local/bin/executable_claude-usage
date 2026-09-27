@@ -6,20 +6,31 @@ CLAUDE_CONFIG_DIR 로 분리된 각 계정(`claude`, `claude2`, …)의 세션(5
 
 ChatGPT 계정(2026-09-08)은 Codex CLI 가 로그인해 둔 `$CODEX_HOME/auth.json`(기본 `~/.codex`)의
 토큰으로 `chatgpt.com/backend-api/wham/usage` 를 읽는다 — Codex CLI `/status` 가 보는 바로 그 창
-(플랜에 따라 주간 하나 또는 5시간+주간). 토큰은 읽기만 하고 절대 갱신하지 않는다(갱신은 Codex CLI 의
-몫 — refresh 토큰이 회전형이라 여기서 돌리면 CLI 쪽 로그인이 깨진다). 만료(발급 후 10일)면 "토큰 만료"
-로 보이고 `codex` 를 한 번 실행하면 살아난다. `CLAUDE_USAGE_CHATGPT=0` 으로 끈다.
+(플랜에 따라 주간 하나 또는 5시간+주간). `CLAUDE_USAGE_CHATGPT=0` 으로 끈다.
 
-크레덴셜은 Claude Code 가 두는 곳에서 그대로 읽는다:
+토큰은 Claude·ChatGPT 모두 읽기만 하고 절대 갱신하지 않는다. 갱신은 각 CLI 의 몫이다 — refresh 토큰이
+회전형이라 남이 돌리면 CLI 가 든 토큰이 소비된 것이 되어 CLI 가 로그아웃된다(2026-09-26 hermes 가 기본
+계정에 실제로 그랬다 → hermes 패치 S12 로 막음). 그래서 상태를 셋으로 가른다:
+  유휴(idle)            access token(Claude 8h · ChatGPT 10일)만 만료, refresh 토큰은 살아 있음 — 그 계정의
+                        CLI 가 안 돌았을 뿐. 다음 실행 때 CLI 가 스스로 갱신한다. 직전 조회값을 "언제 값인지"
+                        와 함께 보여 준다(STALE_MAX 까지). 예전엔 이걸 "토큰 만료" 로 그려 재로그인하게 만들었다.
+  로그인 만료           CLI 가 refresh 거절(invalid_grant)을 겪어 refreshToken 을 "" 로 비웠거나, refresh 토큰
+  (login_expired)       자체가 만료됐거나, 만료 전 토큰을 서버가 401/403 으로 거절 — 재로그인만 답이다.
+  키체인 잠김           SSH 세션 등에서 키체인을 못 엶 — 계정이 아니라 셸의 사정이라 캐시에 박지 않는다.
+상태 전이는 `events.log`(캐시 디렉터리)에 한 줄씩 남는다(토큰 값 없음).
+
+크레덴셜은 Claude Code 가 읽는 순서 그대로 읽는다:
   macOS  → 키체인 `Claude Code-credentials` (기본 계정)
            `Claude Code-credentials-<sha256(CLAUDE_CONFIG_DIR)[:8]>` (보조 계정)
+           키체인에 항목이 없을 때만 <configdir>/.credentials.json (CLI 의 폴백과 같다)
   그 외  → <configdir>/.credentials.json
-둘 다 있으면 더 늦게 만료되는(= 가장 최근에 갱신된) 쪽을 쓴다.
 
 셸 시작을 절대 막지 않는 3단 캐시:
   1. 렌더 캐시(render-<style>-<width>.txt) — zsh 가 그냥 cat 한다 (~1ms)
   2. 상태 캐시(state.json)                 — 신선도 판정용
   3. 백그라운드 갱신                        — 낡았으면 detach 해서 조용히 새로 받는다
+     (유휴·로그인 만료 계정이 있으면 `attention` 표식을 두고, 그 계정 토큰이 바뀌었으면(= `claude3` 실행·
+      /login 끝) TTL 대신 ATTENTION_TTL(60초) 뒤 다시 본다 — 토큰이 그대로면 API 를 더 부르지 않는다)
 
 네트워크가 없으면(리부트 직후 첫 셸은 Wi-Fi 결합보다 먼저 뜬다 — 2026-09-20) 그 실패를 캐시에
 쓰지 않는다: 마지막 성공값을 그대로 보여 주고 " ⚠ 네트워크 없음" 한 줄만 덧붙인 뒤, 백그라운드
@@ -56,9 +67,13 @@ CACHE_DIR = os.environ.get(
 )
 CACHE_FILE = os.path.join(CACHE_DIR, "state.json")
 LOCK_FILE = os.path.join(CACHE_DIR, "refresh.lock")
+EVENT_LOG = os.path.join(CACHE_DIR, "events.log")          # 계정 상태 전이 기록(토큰 값 없음)
+EVENT_LOG_MAX = 256 * 1024
+ATTENTION_FILE = os.path.join(CACHE_DIR, "attention")      # 곧 바뀔 상태가 있다는 표식(zsh 가 stat 만 한다)
 RENDER_RE = re.compile(r"^render-(bars|panel|compact)-(\d+)\.txt$")
 
 TTL = int(os.environ.get("CLAUDE_USAGE_TTL", "300"))                # 캐시 신선도(초)
+ATTENTION_TTL = int(os.environ.get("CLAUDE_USAGE_ATTENTION_TTL", "60"))  # 유휴·로그인 만료가 있을 때의 신선도
 STALE_MAX = int(os.environ.get("CLAUDE_USAGE_STALE_MAX", "86400"))  # 이보다 낡으면 아예 숨김
 TIMEOUT = float(os.environ.get("CLAUDE_USAGE_TIMEOUT", "8"))
 COLD_TIMEOUT = float(os.environ.get("CLAUDE_USAGE_COLD_TIMEOUT", "4"))
@@ -236,7 +251,11 @@ def fetch_chatgpt_account(label: str, codex_home: str, timeout: float) -> dict:
     prof = claims.get("https://api.openai.com/profile") or {}
     rec["email"] = prof.get("email") or claims.get("email")
     if exp and exp <= time.time():
-        rec["state"] = "token_expired"
+        # access token 만 만료 — refresh 토큰이 있으면 CLI 가 다음 실행 때 갱신한다(유휴, 재로그인 불필요).
+        if tokens.get("refresh_token"):
+            rec["state"] = "idle"
+        else:
+            rec["state"], rec["error"], rec["login_cmd"] = "login_expired", "refresh 토큰 없음", "codex login"
         return rec
     account_id = str(tokens.get("account_id") or auth.get("chatgpt_account_id") or "").strip()
     headers = {"Authorization": f"Bearer {access}", "Accept": "application/json", "User-Agent": "codex-cli"}
@@ -248,7 +267,7 @@ def fetch_chatgpt_account(label: str, codex_home: str, timeout: float) -> dict:
         rec["error"] = str(body)
         return rec
     if status in (401, 403):
-        rec["state"] = "token_expired"
+        rec["state"], rec["error"], rec["login_cmd"] = "login_expired", f"HTTP {status}", "codex login"
         return rec
     if status != 200 or not isinstance(body, dict):
         rec["state"] = "error"
@@ -283,20 +302,33 @@ def _keychain_services(config_dir: str) -> list[str]:
     return out
 
 
-def _oauth_from_keychain(config_dir: str) -> list[dict]:
+KEYCHAIN_NOT_FOUND = 44          # errSecItemNotFound — 이 서비스명엔 항목이 없다(= 못 연 것과 다르다)
+
+
+def _keychain_lookup(config_dir: str) -> tuple[list[dict], bool]:
+    """(키체인에서 찾은 크레덴셜, 키체인을 못 열었는가 — 잠김·SSH 세션 등)."""
     if sys.platform != "darwin":
-        return []
-    found = []
+        return [], False
+    found, unavailable = [], False
     for svc in _keychain_services(config_dir):
         try:
             proc = subprocess.run(["security", "find-generic-password", "-s", svc, "-w"],
                                   capture_output=True, text=True, timeout=5)
-            oauth = json.loads(proc.stdout).get("claudeAiOauth") if proc.returncode == 0 else None
+        except Exception:
+            unavailable = True
+            continue
+        if proc.returncode == KEYCHAIN_NOT_FOUND:
+            continue
+        if proc.returncode != 0:
+            unavailable = True
+            continue
+        try:
+            oauth = json.loads(proc.stdout).get("claudeAiOauth")
         except Exception:
             oauth = None
         if oauth:
             found.append(oauth)
-    return found
+    return found, unavailable
 
 
 def _oauth_from_file(config_dir: str) -> list[dict]:
@@ -308,19 +340,26 @@ def _oauth_from_file(config_dir: str) -> list[dict]:
     return [oauth] if oauth else []
 
 
-def _creds(config_dir: str) -> dict | None:
-    """키체인(macOS)과 .credentials.json 중 가장 늦게 만료되는 크레덴셜.
+def _creds(config_dir: str) -> tuple[dict | None, str]:
+    """(Claude Code 가 지금 실제로 쓰는 크레덴셜, 출처 keychain·file·locked·none).
 
-    Claude Code 는 토큰을 갱신할 때 키체인만 새로 쓰므로, 예전 버전이 남긴 파일보다 키체인이 새롭다.
+    CLI 와 같은 순서로 읽는다 — macOS 에선 키체인이 정본이고 `.credentials.json` 은 키체인에 항목이
+    없을 때만 보는 폴백이다. 예전엔 둘 중 늦게 만료되는 쪽을 골랐는데, 그 파일을 쓰는 건 CLI 가 아니라
+    hermes 였다(2026-09-26 기본 계정 토큰을 몰래 회전시켜 파일에만 기록). CLI 는 그 토큰을 못 보고
+    키체인의 소비된 refresh 토큰으로 갱신하다 "Login expired" 가 됐는데, 패널만 파일 토큰으로 정상을
+    그리고 있었다. 키체인을 못 열면(잠김·SSH 세션) 파일로 넘어가지 않는다 — 그건 CLI 의 토큰이 아니다.
     """
-    found = _oauth_from_keychain(config_dir) + _oauth_from_file(config_dir)
-    if not found:
-        return None
-    return max(found, key=lambda o: o.get("expiresAt") or 0)
+    keychain, unavailable = _keychain_lookup(config_dir)
+    if keychain:
+        return max(keychain, key=lambda o: o.get("expiresAt") or 0), "keychain"
+    if unavailable:
+        return None, "locked"
+    files = _oauth_from_file(config_dir)
+    return (files[0], "file") if files else (None, "none")
 
 
 def has_creds(config_dir: str) -> bool:
-    return _creds(config_dir) is not None
+    return _creds(config_dir)[1] in ("keychain", "file")
 
 
 def _transport_error(exc: Exception) -> str:
@@ -360,15 +399,31 @@ def _get(path: str, token: str, timeout: float) -> tuple[int, object]:
 
 def fetch_account(label: str, config_dir: str, timeout: float) -> dict:
     rec: dict = {"label": label, "dir": config_dir, "kind": "claude"}
-    oauth = _creds(config_dir)
+    oauth, source = _creds(config_dir)
+    if source == "locked":                           # 계정이 아니라 이 셸(SSH 등)의 사정
+        rec["state"] = "keychain_locked"
+        return rec
     if not oauth:
         rec["state"] = "logged_out"
         return rec
+    rec["cred_src"] = source
 
+    now = time.time()
     exp = (oauth.get("expiresAt") or 0) / 1000
     rec["token_expires_at"] = exp
-    if exp and exp <= time.time():
-        rec["state"] = "token_expired"
+    refresh = oauth.get("refreshToken")
+    refresh_exp = (oauth.get("refreshTokenExpiresAt") or 0) / 1000
+    # CLI 는 refresh 가 invalid_grant 로 거절되면 refreshToken 을 "" 로 비워 둔다 — 재로그인만 답이다.
+    if refresh == "" or (refresh_exp and refresh_exp <= now):
+        rec["state"], rec["error"] = "login_expired", "refresh 토큰 폐기" if refresh == "" else "refresh 토큰 만료"
+        return rec
+    if exp and exp <= now:
+        # access token(8h)만 만료 — 이 계정의 CLI 가 그동안 안 돌았을 뿐이다. 갱신은 CLI 의 몫이다
+        # (여기서 refresh 를 돌리면 회전형 토큰이 갈라져 CLI 가 로그아웃된다 — 위 hermes 사고).
+        if refresh:
+            rec["state"] = "idle"
+        else:
+            rec["state"], rec["error"] = "login_expired", "refresh 토큰 없음"
         return rec
 
     token = oauth.get("accessToken") or ""
@@ -377,8 +432,8 @@ def fetch_account(label: str, config_dir: str, timeout: float) -> dict:
         rec["state"] = "offline"
         rec["error"] = str(usage)
         return rec
-    if status in (401, 403):
-        rec["state"] = "token_expired"
+    if status in (401, 403):                         # 만료 전 토큰을 서버가 거절 = grant 폐기
+        rec["state"], rec["error"] = "login_expired", f"HTTP {status}"
         return rec
     if status != 200 or not isinstance(usage, dict):
         rec["state"] = "error"
@@ -578,10 +633,18 @@ def gauge(ink: Ink, pct, width: int, severity: str = "normal") -> str:
 
 STATE_MSG = {
     "logged_out": ("✗", "미로그인 — `{cmd}` 를 실행해 브라우저 로그인"),
-    "token_expired": ("⚠", "토큰 만료 — `{cmd}` 를 한 번 실행하면 갱신됨"),
+    # 유휴 = access token(8h)만 만료. refresh 토큰은 살아 있어 CLI 가 다음 실행 때 스스로 갱신한다.
+    # 예전엔 이걸 "토큰 만료" 로 그려 멀쩡한 계정을 재로그인하게 만들었다(2026-09-27).
+    "idle": ("⏸", "유휴 — 토큰만 만료, 다음 `{cmd}` 실행 때 자동 갱신 (재로그인 불필요)"),
+    "login_expired": ("✗", "로그인 만료 ({err}) — {relogin}"),
+    "token_expired": ("⚠", "토큰 만료 — `{cmd}` 를 한 번 실행하면 갱신됨"),     # 2026-09-27 이전 캐시
+    "keychain_locked": ("⚠", "키체인을 못 엶 (잠김·SSH 세션) — 이 셸에선 조회 불가"),
     "error": ("⚠", "조회 실패 ({err})"),
     "offline": ("⚠", "네트워크 없음 ({err}) — 연결되면 자동 재시도"),
 }
+SOFT_STATES = ("idle", "keychain_locked")          # 계정이 고장난 게 아니다 — 빨강 대신 노랑
+TRANSIENT_STATES = ("offline", "keychain_locked")   # 계정이 아니라 이 컴퓨터·셸의 사정 — 캐시에 박지 않는다
+ATTENTION_STATES = ("idle", "login_expired", "logged_out", "token_expired", "keychain_locked")
 
 
 def problem_of(acct: dict) -> tuple[str, str] | None:
@@ -589,7 +652,29 @@ def problem_of(acct: dict) -> tuple[str, str] | None:
         return None
     icon, msg = STATE_MSG.get(acct.get("state"), ("⚠", "알 수 없는 상태"))
     cmd = acct.get("login_cmd") or acct.get("label", "claude")
-    return icon, msg.format(cmd=cmd, err=acct.get("error", "?"))
+    relogin = f"`{cmd}`" if acct.get("kind") == "chatgpt" else f"`{cmd}` 실행 후 /login"
+    return icon, msg.format(cmd=cmd, err=acct.get("error", "?"), relogin=relogin)
+
+
+def problem_ink(ink: "Ink", acct: dict):
+    return ink.yellow if acct.get("state") in SOFT_STATES else ink.red
+
+
+def stale_note(acct: dict) -> str | None:
+    """유휴·키체인 잠김 계정이 들고 온 직전 조회값 — 언제 값인지와 왜 갱신이 멈췄는지 한 줄."""
+    reason = acct.get("stale")
+    if reason not in SOFT_STATES:
+        return None
+    when = datetime.fromtimestamp(acct.get("as_of") or 0).astimezone().strftime("%m/%d %H:%M")
+    if reason == "idle":
+        return f"⏸ 유휴 · {when} 조회값 — 토큰만 만료, 다음 `{acct.get('login_cmd') or acct['label']}` 실행 때 자동 갱신"
+    return f"⚠ 키체인을 못 엶 · {when} 조회값"
+
+
+def needs_attention(state: dict | None) -> bool:
+    """사용자가 손쓰면(`claude3` 실행·/login) 곧 바뀔 상태 — 캐시 TTL 보다 짧게 다시 본다."""
+    return any(a.get("state") in ATTENTION_STATES or a.get("stale") in SOFT_STATES
+               for a in (state or {}).get("accounts") or [])
 
 
 # ─────────────────────────────────────────── 렌더러
@@ -609,6 +694,8 @@ def render(state: dict, style: str, ink: Ink, width: int) -> str:
     if state.get("offline"):
         # 숫자는 마지막 성공값이다 — 왜 갱신이 멈췄는지 스타일 공통으로 한 줄 밝힌다.
         text = f" {ink.red('⚠')} {ink.dim('네트워크 없음 · 아래는 마지막 조회값')}\n" + text
+    elif state.get("keychain_locked"):
+        text = f" {ink.yellow('⚠')} {ink.dim('키체인을 못 엶 (잠김·SSH 세션) · 아래는 마지막 조회값')}\n" + text
     return text
 
 
@@ -628,8 +715,11 @@ def render_bars(accounts, stamp, ink, width) -> str:
         out.append(head)
         problem = problem_of(acct)
         if problem:
-            out.append(f"   {ink.red(problem[0])} {ink.dim(problem[1])}")
+            out.append(f"   {problem_ink(ink, acct)(problem[0])} {ink.dim(problem[1])}")
             continue
+        stale = stale_note(acct)
+        if stale:
+            out.append(f"   {ink.yellow(stale[0])}{ink.dim(stale[1:])}")
         warning = limit_warning(acct)
         if warning:
             out.append(f"   {ink.red(warning)}")
@@ -674,8 +764,12 @@ def render_panel(accounts, stamp, ink, width) -> str:
         problem = problem_of(acct)
         if problem:
             icon, msg = problem[0], ellipsize(problem[1], inner - 4)
-            out.append(line(f"  {ink.red(icon)} {ink.dim(msg)}", f"  {icon} {msg}"))
+            out.append(line(f"  {problem_ink(ink, acct)(icon)} {ink.dim(msg)}", f"  {icon} {msg}"))
             continue
+        stale = stale_note(acct)
+        if stale:
+            stale = ellipsize(stale, inner - 2)
+            out.append(line(f"  {ink.yellow(stale[0])}{ink.dim(stale[1:])}", f"  {stale}"))
 
         warning = limit_warning(acct)
         if warning:
@@ -708,7 +802,7 @@ def render_compact(accounts, stamp, ink, width) -> str:
         lbl = pad(acct["label"], 8)
         problem = problem_of(acct)
         if problem:
-            out.append(f" {ink.bold(ink.blue(lbl))}{ink.red(problem[0])} {ink.dim(problem[1])}")
+            out.append(f" {ink.bold(ink.blue(lbl))}{problem_ink(ink, acct)(problem[0])} {ink.dim(problem[1])}")
             continue
         rows = rows_of(acct)
         main = [r for r in rows if not r.get("extra")] or rows
@@ -730,6 +824,9 @@ def render_compact(accounts, stamp, ink, width) -> str:
         if width >= 100 and email and plain + 1 + dwidth(email) <= width:
             line += " " + ink.dim(email)
         out.append(line)
+        stale = stale_note(acct)
+        if stale:
+            out.append(f"   {ink.yellow(stale[0])}{ink.dim(stale[1:])}")
         warning = limit_warning(acct)
         if warning:
             out.append(f"   {ink.red(warning)}")
@@ -799,26 +896,106 @@ def merge_offline(results: list[dict], prev: dict | None) -> tuple[dict, bool]:
     새 셸마다 "조회 실패" 가 그려진다 — 2026-09-20 리부트 직후 첫 셸이 Wi-Fi 결합보다 먼저 떠서
     네 계정이 한꺼번에 URLError 로 굳었던 사고. 그래서 한 계정도 응답을 못 받았으면 state.json 을
     아예 건드리지 않고(zsh 는 이 파일의 mtime 으로 신선도를 재므로 다음 셸이 곧바로 다시 갱신한다),
-    일부만 실패했으면 그 계정만 직전 성공값을 들고 간다.
-    """
-    if not any(r.get("state") == "offline" for r in results):
-        return {"fetched_at": time.time(), "accounts": results}, True
+    일부만 실패했으면 그 계정만 직전 성공값을 들고 간다. 키체인을 못 여는 셸(잠김·SSH 세션)도 같은
+    취급이다.
 
-    if all(r.get("state") == "offline" for r in results):
+    유휴 계정(access token 만 만료 — 그 계정의 CLI 가 안 돌았을 뿐, 2026-09-27)은 캐시해도 되는
+    사실이지만 숫자를 지우지 않는다: 직전 성공값을 `stale: "idle"` 로 표시해 STALE_MAX 까지 들고 가고
+    렌더러가 "언제 값인지" 를 한 줄 밝힌다.
+    """
+    now = time.time()
+    states = [r.get("state") for r in results]
+    flags = {**({"offline": True} if "offline" in states else {}),
+             **({"keychain_locked": True} if "keychain_locked" in states else {})}
+    if results and all(s in TRANSIENT_STATES for s in states):
         if prev and prev.get("accounts"):
-            return {**prev, "offline": True, "checked_at": time.time()}, False
-        return {"fetched_at": time.time(), "accounts": results, "offline": True}, False
+            return {**prev, **flags, "checked_at": now}, False
+        return {"fetched_at": now, "accounts": results, **flags}, False
 
     old = {(a.get("label"), a.get("dir")): a for a in (prev or {}).get("accounts") or []}
     stamp = (prev or {}).get("fetched_at")
     merged = []
     for rec in results:
         last = old.get((rec.get("label"), rec.get("dir")))
-        if rec.get("state") == "offline" and last and last.get("state") == "ok":
+        state = rec.get("state")
+        if not (last and last.get("state") == "ok"):
+            merged.append(rec)
+        elif state == "offline":
             merged.append({**last, "as_of": last.get("as_of") or stamp})
+        elif state in SOFT_STATES and now - (last.get("as_of") or stamp or 0) <= STALE_MAX:
+            merged.append({**last, "as_of": last.get("as_of") or stamp, "stale": state,
+                           "token_expires_at": rec.get("token_expires_at", last.get("token_expires_at"))})
         else:
             merged.append(rec)
-    return {"fetched_at": time.time(), "accounts": merged, "offline": True}, True
+    return {"fetched_at": now, "accounts": merged, **flags}, True
+
+
+def log_transitions(results: list[dict], prev: dict | None) -> None:
+    """계정 상태가 바뀔 때만 events.log 에 한 줄 (2026-09-27).
+
+    "가끔 몇 계정이 토큰 만료" 를 거슬러 올라갈 기록이 없었다 — 전이 시각을 남겨 두면 CLI 의
+    /login 기록(<configdir>/history.jsonl)·hermes 로그와 바로 대조된다. 토큰 값은 쓰지 않는다.
+    네트워크 단절은 계정 상태가 아니라 뺀다.
+    """
+    old = {(a.get("label"), a.get("dir")): a.get("stale") or a.get("state")
+           for a in (prev or {}).get("accounts") or []}
+    stamp = datetime.now().astimezone().isoformat(timespec="seconds")
+    lines = []
+    for rec in results:
+        new, before = rec.get("state"), old.get((rec.get("label"), rec.get("dir")))
+        if new == "offline" or new == before:
+            continue
+        detail = [f"src={rec['cred_src']}"] if rec.get("cred_src") else []
+        if rec.get("token_expires_at"):
+            detail.append("token_exp=" + datetime.fromtimestamp(rec["token_expires_at"]).astimezone()
+                          .strftime("%m/%d %H:%M"))
+        if rec.get("error"):
+            detail.append(f"why={rec['error']}")
+        lines.append(f"{stamp} {rec.get('label')} {before or '-'} → {new} {' '.join(detail)}".rstrip())
+    if not lines:
+        return
+    try:
+        if os.path.exists(EVENT_LOG) and os.path.getsize(EVENT_LOG) > EVENT_LOG_MAX:
+            with open(EVENT_LOG) as fh:
+                _atomic_write(EVENT_LOG, "".join(fh.readlines()[-500:]))
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        with open(EVENT_LOG, "a") as fh:
+            fh.write("\n".join(lines) + "\n")
+    except OSError:
+        pass
+
+
+def creds_changed(state: dict) -> bool:
+    """주의 계정 중 크레덴셜이 캐시 이후 바뀐 게 있는가 — `claude3` 실행·/login 이 끝났다는 신호.
+
+    유휴 계정은 몇 시간씩 유휴로 남는다. 그동안 60초마다 전 계정 API 를 다시 부르지 않도록, 짧은
+    재조회는 토큰 만료 시각이 실제로 바뀌었을 때만 한다(키체인·파일만 읽고 네트워크는 안 탄다).
+    """
+    for acct in state.get("accounts") or []:
+        if not (acct.get("state") in ATTENTION_STATES or acct.get("stale") in SOFT_STATES):
+            continue
+        if acct.get("kind") == "chatgpt":
+            tokens = _codex_tokens(acct.get("dir") or "") or {}
+            current = _jwt_claims(str(tokens.get("access_token") or "")).get("exp") or 0
+        else:
+            oauth, source = _creds(acct.get("dir") or "")
+            if source == "locked":
+                continue
+            current = ((oauth or {}).get("expiresAt") or 0) / 1000
+        if current != (acct.get("token_expires_at") or 0):
+            return True
+    return False
+
+
+def mark_attention(state: dict) -> None:
+    """zsh 가 JSON 을 안 읽고도 '곧 바뀔 상태가 있다' 를 알게 하는 표식 파일."""
+    try:
+        if needs_attention(state):
+            _atomic_write(ATTENTION_FILE, "")
+        elif os.path.exists(ATTENTION_FILE):
+            os.unlink(ATTENTION_FILE)
+    except OSError:
+        pass
 
 
 def refresh(timeout: float, targets: set[tuple[str, int]] | None = None) -> dict:
@@ -831,10 +1008,13 @@ def refresh(timeout: float, targets: set[tuple[str, int]] | None = None) -> dict
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(jobs))) as pool:
         results = list(pool.map(fetch, jobs))
-    state, cacheable = merge_offline(results, load_cache())
+    prev = load_cache()
+    log_transitions(results, prev)
+    state, cacheable = merge_offline(results, prev)
     if cacheable:
         _atomic_write(CACHE_FILE, json.dumps(state, ensure_ascii=False))
         write_renders(state, (targets or set()) | known_renders())
+        mark_attention(state)
     return state
 
 
@@ -920,8 +1100,10 @@ def main() -> int:
             state = load_cache()
             if not state:
                 state = refresh(COLD_TIMEOUT, target)          # 최초 1회만 잠깐 대기
-            elif time.time() - state.get("fetched_at", 0) >= TTL:
-                spawn_refresh(args.style, width)               # 이번엔 캐시로, 다음부터 신선
+            else:
+                age = time.time() - state.get("fetched_at", 0)
+                if age >= TTL or (age >= ATTENTION_TTL and needs_attention(state) and creds_changed(state)):
+                    spawn_refresh(args.style, width)           # 이번엔 캐시로, 다음부터 신선
             if state.get("offline"):
                 spawn_refresh(args.style, width)               # 연결이 돌아오면 조용히 채워 둔다
     finally:

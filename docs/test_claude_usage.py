@@ -16,6 +16,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 usage = runpy.run_path(str(ROOT / "private_dot_local/bin/executable_claude-usage"))
+LIVE = usage["render"].__globals__   # run_path 는 사본을 돌려준다 — 목은 함수가 실제로 보는 전역에 건다
 ACCOUNT = {
     "label": "claude2", "dir": "/unused/claude-b", "kind": "claude", "state": "ok",
     "usage": {"limits": [
@@ -181,8 +182,158 @@ class OfflineCacheTests(unittest.TestCase):
             self.assertEqual(_json.loads((cache / "state.json").read_text()), good)
 
 
+class TokenStateTests(unittest.TestCase):
+    """2026-09-27: 유휴 계정(access token 8h 만 만료)을 "토큰 만료" 로 그려 재로그인하게 만들었다.
+
+    진짜 로그인 만료(CLI 가 refresh 거절을 겪어 refreshToken 을 비움 · 서버 401)만 /login 을 안내한다.
+    """
+    NOW = 1790000000
+    LIVE = {"accessToken": "a", "refreshToken": "r", "expiresAt": (NOW + 3600) * 1000,
+            "refreshTokenExpiresAt": (NOW + 30 * 86400) * 1000}
+
+    def fetch(self, oauth, source="keychain", http=(200, {"limits": []})):
+        with patch.dict(LIVE, {"_creds": lambda _d: (oauth, source),
+                                "_get": lambda *_a: http}), \
+                patch("time.time", return_value=self.NOW):
+            return usage["fetch_account"]("claude3", "/unused/claude-c", 1)
+
+    def test_expired_access_token_with_live_refresh_is_idle(self):
+        rec = self.fetch({**self.LIVE, "expiresAt": (self.NOW - 60) * 1000})
+        self.assertEqual(rec["state"], "idle")
+        text = usage["render"]({"fetched_at": self.NOW, "accounts": [rec]}, "bars", usage["Ink"](False), 120)
+        self.assertIn("유휴", text)
+        self.assertIn("재로그인 불필요", text)
+        self.assertNotIn("토큰 만료", text)
+        self.assertNotIn("/login", text)
+
+    def test_refresh_token_the_cli_marked_dead_needs_login(self):
+        rec = self.fetch({**self.LIVE, "refreshToken": "", "expiresAt": (self.NOW - 60) * 1000})
+        self.assertEqual((rec["state"], rec["error"]), ("login_expired", "refresh 토큰 폐기"))
+        text = usage["render"]({"fetched_at": self.NOW, "accounts": [rec]}, "compact", usage["Ink"](False), 120)
+        self.assertIn("`claude3` 실행 후 /login", text)
+
+    def test_expired_refresh_token_needs_login(self):
+        rec = self.fetch({**self.LIVE, "expiresAt": (self.NOW - 60) * 1000,
+                          "refreshTokenExpiresAt": (self.NOW - 1) * 1000})
+        self.assertEqual(rec["state"], "login_expired")
+
+    def test_server_rejecting_a_live_token_needs_login(self):
+        rec = self.fetch(dict(self.LIVE), http=(401, None))
+        self.assertEqual((rec["state"], rec["error"]), ("login_expired", "HTTP 401"))
+
+    def test_locked_keychain_is_not_reported_as_logged_out(self):
+        rec = self.fetch(None, source="locked")
+        self.assertEqual(rec["state"], "keychain_locked")
+
+    def test_keychain_wins_over_a_later_expiring_file(self):
+        """hermes 가 회전시켜 파일에만 쓴 포크(09-26)를 CLI 는 안 본다 — 패널도 안 본다."""
+        keychain = {"accessToken": "cli", "expiresAt": 1}
+        fork = {"accessToken": "hermes-fork", "expiresAt": 9_999_999_999_999}
+        with patch.dict(LIVE, {"_keychain_lookup": lambda _d: ([keychain], False),
+                                "_oauth_from_file": lambda _d: [fork]}):
+            self.assertEqual(usage["_creds"]("/unused"), (keychain, "keychain"))
+        with patch.dict(LIVE, {"_keychain_lookup": lambda _d: ([], True),
+                                "_oauth_from_file": lambda _d: [fork]}):
+            self.assertEqual(usage["_creds"]("/unused"), (None, "locked"))
+        with patch.dict(LIVE, {"_keychain_lookup": lambda _d: ([], False),
+                                "_oauth_from_file": lambda _d: [fork]}):
+            self.assertEqual(usage["_creds"]("/unused"), (fork, "file"))   # 키체인에 항목이 없을 때만
+
+    def test_chatgpt_idle_and_rejected(self):
+        import base64 as _b64
+        import json as _json
+
+        def jwt(exp):
+            body = _b64.urlsafe_b64encode(_json.dumps({"exp": exp}).encode()).decode().rstrip("=")
+            return f"h.{body}.s"
+        with tempfile.TemporaryDirectory() as home:
+            auth = Path(home) / "auth.json"
+            auth.write_text(_json.dumps({"tokens": {"access_token": jwt(time.time() - 60),
+                                                    "refresh_token": "r"}}))
+            self.assertEqual(usage["fetch_chatgpt_account"]("chatgpt", home, 1)["state"], "idle")
+            auth.write_text(_json.dumps({"tokens": {"access_token": jwt(time.time() + 3600)}}))
+            with patch.dict(LIVE, {"_http_get": lambda *_a: (401, None)}):
+                rec = usage["fetch_chatgpt_account"]("chatgpt", home, 1)
+            self.assertEqual(rec["state"], "login_expired")
+            self.assertIn("`codex login`", usage["problem_of"](rec)[1])
+
+
+class IdleCarryTests(unittest.TestCase):
+    """유휴 계정은 숫자를 지우지 않고 직전 성공값을 '언제 값인지' 와 함께 들고 간다."""
+
+    def prev(self, age):
+        account = {**copy.deepcopy(ACCOUNT), "label": "claude3", "dir": "/unused/claude-c"}
+        return {"fetched_at": time.time() - age, "accounts": [account]}
+
+    IDLE = {"label": "claude3", "dir": "/unused/claude-c", "kind": "claude", "state": "idle"}
+
+    def test_idle_keeps_last_values_with_a_note_in_every_style(self):
+        state, cacheable = usage["merge_offline"]([dict(self.IDLE)], self.prev(3600))
+        self.assertTrue(cacheable)
+        acct = state["accounts"][0]
+        self.assertEqual((acct["state"], acct["stale"]), ("ok", "idle"))
+        for style in ("bars", "panel", "compact"):
+            with self.subTest(style=style):
+                text = usage["render"](state, style, usage["Ink"](False), 120)
+                self.assertIn("52%", text)
+                self.assertIn("유휴", text)
+                self.assertIn("조회값", text)
+
+    def test_idle_values_older_than_stale_max_are_dropped(self):
+        state, _ = usage["merge_offline"]([dict(self.IDLE)], self.prev(usage["STALE_MAX"] + 60))
+        self.assertEqual(state["accounts"][0]["state"], "idle")
+
+    def test_carry_survives_repeated_idle_refreshes_with_the_original_time(self):
+        first, _ = usage["merge_offline"]([dict(self.IDLE)], self.prev(3600))
+        second, _ = usage["merge_offline"]([dict(self.IDLE)], first)
+        self.assertEqual(second["accounts"][0]["as_of"], first["accounts"][0]["as_of"])
+
+    def test_all_locked_keychains_never_touch_the_cache(self):
+        locked = {"label": "claude3", "dir": "/unused/claude-c", "state": "keychain_locked"}
+        state, cacheable = usage["merge_offline"]([locked], self.prev(60))
+        self.assertFalse(cacheable)
+        self.assertIn("키체인을 못 엶", usage["render"](state, "bars", usage["Ink"](False), 120))
+
+    def test_attention_follows_account_states(self):
+        self.assertFalse(usage["needs_attention"](self.prev(60)))
+        state, _ = usage["merge_offline"]([dict(self.IDLE)], self.prev(60))
+        self.assertTrue(usage["needs_attention"](state))
+
+    def test_quick_recheck_only_when_the_cli_actually_refreshed(self):
+        """유휴가 몇 시간 이어져도 60초마다 API 를 두드리지 않는다 — 토큰이 바뀐 뒤에만."""
+        idle = {**self.IDLE, "token_expires_at": 1790000000.5}
+        state, _ = usage["merge_offline"]([idle], self.prev(60))
+        same = ({"expiresAt": 1790000000500, "refreshToken": "r"}, "keychain")
+        fresh = ({"expiresAt": 1790030000500, "refreshToken": "r"}, "keychain")
+        with patch.dict(LIVE, {"_creds": lambda _d: same}):
+            self.assertFalse(usage["creds_changed"](state))
+        with patch.dict(LIVE, {"_creds": lambda _d: fresh}):
+            self.assertTrue(usage["creds_changed"](state))
+        with patch.dict(LIVE, {"_creds": lambda _d: fresh}):     # 주의 계정이 없으면 안 본다
+            self.assertFalse(usage["creds_changed"](self.prev(60)))
+
+
+class EventLogTests(unittest.TestCase):
+    def test_only_transitions_are_logged_without_secrets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "events.log"
+            prev = {"accounts": [{"label": "claude", "dir": "/d", "state": "ok"},
+                                 {"label": "claude3", "dir": "/c", "state": "ok", "stale": "idle"}]}
+            results = [{"label": "claude", "dir": "/d", "state": "login_expired", "error": "refresh 토큰 폐기",
+                        "cred_src": "keychain", "token_expires_at": 1790000000},
+                       {"label": "claude3", "dir": "/c", "state": "idle"},
+                       {"label": "chatgpt", "dir": "/x", "state": "offline"}]
+            with patch.dict(LIVE, {"EVENT_LOG": str(log), "CACHE_DIR": directory}):
+                usage["log_transitions"](results, prev)
+                usage["log_transitions"](results, {"accounts": results})     # 같은 상태 반복 = 무기록
+            lines = log.read_text().splitlines()
+            self.assertEqual(len(lines), 1)
+            self.assertIn("claude ok → login_expired src=keychain", lines[0])
+            self.assertIn("why=refresh 토큰 폐기", lines[0])
+
+
 class ShellCacheTests(unittest.TestCase):
-    def startup(self, age):
+    def startup(self, age, attention=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             cache = root / "cache"
@@ -191,6 +342,8 @@ class ShellCacheTests(unittest.TestCase):
             state.write_text("{}")
             os.utime(state, (time.time() - age, time.time() - age))
             (cache / "render-bars-120.txt").write_text("CACHED_USAGE\n")
+            if attention:
+                (cache / "attention").write_text("")
             # A fake command detects the refresh handoff without loading any credentials.
             script = root / "claude-usage"
             script.write_text('#!/bin/sh\nprintf "%s\\n" "$*" > "$REFRESH_CAPTURE"\n')
@@ -205,7 +358,7 @@ class ShellCacheTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertNotIn("BAD_CAT_WRAPPER", result.stdout)
             for _ in range(100):
-                if age < 300 or (root / "refresh").exists():
+                if (age < 300 and not attention) or (root / "refresh").exists():
                     break
                 time.sleep(.01)
             refreshed = (root / "refresh").read_text() if (root / "refresh").exists() else ""
@@ -222,6 +375,21 @@ class ShellCacheTests(unittest.TestCase):
         self.assertIn("CACHED_USAGE", text)
         self.assertIn("이전 조회값", text)
         self.assertIn("--startup --quiet", refreshed)
+
+    def test_attention_rechecks_quietly_before_ttl(self):
+        """유휴·로그인 만료가 있으면 5분을 안 기다린다 — /login·`claude3` 직후 다음 셸에 반영."""
+        text, refreshed = self.startup(90, attention=True)
+        self.assertIn("CACHED_USAGE", text)
+        self.assertNotIn("이전 조회값", text)                 # 조용히 — 경고 줄 없음
+        self.assertIn("--startup --quiet", refreshed)
+
+    def test_attention_still_waits_a_minute(self):
+        text, refreshed = self.startup(5, attention=True)
+        self.assertEqual(refreshed, "")
+
+    def test_no_attention_keeps_the_normal_ttl(self):
+        text, refreshed = self.startup(90)
+        self.assertEqual(refreshed, "")
 
     def test_expired_cache_is_hidden(self):
         text, refreshed = self.startup(90000)

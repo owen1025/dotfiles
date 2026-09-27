@@ -189,7 +189,9 @@ claude3() { _claude_alt "$HOME/.claude-c" "$@" }
 #                         디렉터리만 있고 로그인 전이면 "미로그인" 줄로 뜬다 — 남은 할 일이 로그인뿐이란 뜻)
 #                         + ChatGPT 계정 한 줄(2026-09-08): Codex CLI 로그인(~/.codex/auth.json)을 읽기만 해서
 #                           주간(플랜에 따라 5시간도) 한도를 같은 패널에 그린다. 끄기 CLAUDE_USAGE_CHATGPT=0,
-#                           다른 CODEX_HOME 은 CLAUDE_USAGE_CHATGPT="chatgpt:~/.codex-b". 토큰 만료면 `codex` 한 번.
+#                           다른 CODEX_HOME 은 CLAUDE_USAGE_CHATGPT="chatgpt:~/.codex-b".
+#                         ⏸ 유휴 = access token 만 만료(그 계정 CLI 가 안 돌았을 뿐) → 다음 실행 때 자동 갱신, 재로그인 불필요.
+#                         ✗ 로그인 만료 = refresh 토큰 폐기·401 → 그 계정 실행 후 /login. 전이 기록 ~/.cache/claude-usage/events.log
 #   claude-usage -r       지금 다시 조회        (= claude-limits)
 #   claude-usage --json   원본 JSON
 #   --style bars|panel|compact                  (기본값 $CLAUDE_USAGE_STYLE, 없으면 bars)
@@ -206,6 +208,7 @@ _claude_usage_startup() {
   local style="${CLAUDE_USAGE_STYLE:-bars}"
   local cols="${COLUMNS:-100}"
   local ttl="${CLAUDE_USAGE_TTL:-300}"
+  local quick="${CLAUDE_USAGE_ATTENTION_TTL:-60}"
   local stale_max="${CLAUDE_USAGE_STALE_MAX:-86400}"
   local render="$dir/render-${style}-${cols}.txt"
 
@@ -230,6 +233,11 @@ _claude_usage_startup() {
         print -r -- ' ⚠ 오래된 사용량 숨김 · 백그라운드 갱신 중 (`claude-usage -r` 즉시 조회)'
       fi
       # --startup 이 갱신 락을 잡는다. 여러 셸을 열어도 API 갱신은 하나만 실행.
+      ( command claude-usage --startup --quiet --style "$style" --width "$cols" &! ) 2>/dev/null
+    elif [[ -e $dir/attention ]] && (( age >= quick )); then
+      # 유휴·로그인 만료 계정이 있으면 TTL(5분)을 기다리지 않고 조용히 다시 본다 — 방금 `claude3` 를
+      # 띄웠거나 /login 했다면 다음 셸에 바로 반영된다(예전엔 5분간 "토큰 만료" 가 그대로 남았다).
+      # API 를 다시 부를지는 claude-usage 가 판단한다(그 계정 토큰이 실제로 바뀌었을 때만).
       ( command claude-usage --startup --quiet --style "$style" --width "$cols" &! ) 2>/dev/null
     fi
   else
