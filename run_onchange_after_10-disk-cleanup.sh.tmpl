@@ -1,0 +1,22 @@
+{{ if eq .chezmoi.os "darwin" -}}
+#!/bin/bash
+# after 단계: 새 머신에서도 바이너리와 plist가 배포된 뒤 등록한다.
+# script hash: {{ include "private_dot_local/bin/executable_disk-cleanup" | sha256sum }}
+# plist hash: {{ include "private_Library/private_LaunchAgents/com.owen.disk-cleanup.plist.tmpl" | sha256sum }}
+# config hash: {{ include "dot_config/disk-cleanup/config.json" | sha256sum }}
+set -euo pipefail
+
+LABEL=com.owen.disk-cleanup
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+PROFILE="$HOME/.hermes/profiles/cs"
+if [[ ! -f "$PROFILE/.env" || ! -f "$PROFILE/scripts/slack_post.py" ]]; then
+    echo "disk-cleanup: Hermes CS Slack 설정이 없어 자동 등록을 건너뜀"
+    exit 0
+fi
+[[ -x "$HOME/.local/bin/disk-cleanup" && -f "$PLIST" ]]
+/usr/bin/plutil -lint "$PLIST"
+/bin/launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+/bin/launchctl enable "gui/$(id -u)/$LABEL"
+/bin/launchctl bootstrap "gui/$(id -u)" "$PLIST"
+echo "disk-cleanup: 매일 04:30(현지 시각) launchd 등록, 결과는 Slack #ops"
+{{ end -}}
