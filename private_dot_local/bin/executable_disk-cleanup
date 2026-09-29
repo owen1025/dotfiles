@@ -321,6 +321,8 @@ def notification(report):
     def gib(value):
         return f"{value / 1024**3:.2f}GiB"
     title = "디스크 자동 청소 완료" if not report.get("fatal") else "디스크 자동 청소 중단"
+    if report.get("errors") and not report.get("fatal"):
+        title = "디스크 자동 청소 일부 완료"
     lines = [f"[{title}] {socket.gethostname()}",
              f"시각: {report['finished']}",
              f"여유 공간: {gib(report['free_before'])} → {gib(report['free_after'])}",

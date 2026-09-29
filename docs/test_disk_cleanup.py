@@ -212,6 +212,13 @@ class CleanupTests(unittest.TestCase):
         self.assertIn("disk-cleanup:two", send.call_args_list[1].args[0])
         self.assertEqual(json.loads((state / "pending-slack.json").read_text()), [])
 
+    def test_permission_error_is_not_reported_as_full_success(self):
+        report = {"finished": "test", "free_before": 0, "free_after": 20 * 1024**3,
+                  "groups": {}, "removed_bytes": 0, "errors": ["휴지통: PermissionError"]}
+        message = gc.notification(report)
+        self.assertIn("일부 완료", message)
+        self.assertIn("휴지통: PermissionError", message)
+
 
 if __name__ == "__main__":
     unittest.main()

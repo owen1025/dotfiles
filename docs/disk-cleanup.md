@@ -29,6 +29,17 @@
 Logi 시스템 캐시는 사용자에게 쓰기 권한이 있을 때만 정리하며, 없으면 #ops에 보존 사유를
 표시한다. 자동 sudo·암호 저장·앱 강제 종료는 하지 않는다.
 
+### 이 머신에서 확인한 macOS 접근 권한 제한
+
+2026-09-29 launchd 첫 실행에서 일반 캐시·런타임 검사는 정상 동작하고 Slack 발송도
+성공했지만, `~/.Trash`와 Finder `TemporaryItems`는 `PermissionError`로 거부됐다.
+터미널/에이전트 앱의 권한은 별도 launchd 프로세스에 자동으로 전달되지 않는다.
+이 두 경로까지 자동 청소하려면 사용자가 **시스템 설정 → 개인정보 보호 및 보안 →
+전체 디스크 접근 권한**에서 실행 인터프리터 `/opt/homebrew/bin/python3`를 허용해야 한다.
+이 권한은 Python 프로세스의 다른 실행에도 적용되므로 사용자가 직접 결정·설정한다.
+허용 전에는 두 경로를 건드리지 않고 Slack에 오류를 보고하며 나머지 청소는 계속한다.
+Logi `/Library/.../cache`의 root 소유 권한은 별개이며 전체 디스크 접근 권한으로 해결되지 않는다.
+
 ## Slack
 
 - 채널: `#ops` (`C0C4SVD21K4`, nioh 워크스페이스).
@@ -54,6 +65,14 @@ launchctl bootout gui/$(id -u)/com.owen.disk-cleanup
 after 단계에 등록한다. 최초 설치 및 변경 적용 자체는 청소를 즉시 실행하지 않는다.
 Linux에는 LaunchAgent를 배포하지 않고 Python 실행도 macOS 여부를 확인한다.
 CS의 `.env`/발송 helper가 없는 머신은 자동 등록하지 않는다.
+
+선택 적용은 파일과 등록 스크립트를 두 단계로 실행한다. 새 설정 디렉터리는 파일이 아닌
+디렉터리를 대상으로 지정해야 한다.
+
+```bash
+chezmoi apply --exclude=scripts ~/.local/bin/disk-cleanup ~/.config/disk-cleanup ~/Library/LaunchAgents/com.owen.disk-cleanup.plist
+chezmoi apply ~/10-disk-cleanup.sh
+```
 
 상태는 `~/.local/state/disk-cleanup/`에 저장한다:
 
