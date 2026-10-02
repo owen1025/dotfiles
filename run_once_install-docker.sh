@@ -1,4 +1,6 @@
 #!/bin/bash
+# macOS 는 Docker Desktop 을 쓰지 않는다(2026-10-02 제외 결정) — 건너뛴다
+[ "$(uname -s)" = "Darwin" ] && exit 0
 set -e
 
 case "$(uname -s)" in

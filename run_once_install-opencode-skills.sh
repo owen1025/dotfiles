@@ -1,4 +1,6 @@
 #!/bin/bash
+# OpenCode 퇴역 — macOS 는 건너뛴다(2026-10-02 M6 이관)
+[ "$(uname -s)" = "Darwin" ] && exit 0
 set -e
 eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /home/linuxbrew/.linuxbrew/bin/brew shellenv 2>/dev/null)" || true
 
