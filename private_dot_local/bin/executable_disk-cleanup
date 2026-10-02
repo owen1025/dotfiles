@@ -30,6 +30,8 @@ import uuid
 
 DAY = 86400
 DEFAULT_CHANNEL = "C0C4SVD21K4"  # nioh / #ops, 2026-09-29 조회 확인
+# macOS CacheDelete가 ~14.8GB 아래에서 샌드박스 앱을 강제 종료한다. 그 전에 경고한다.
+LOW_FREE = 20 * 1024**3
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,11 @@ class Rule:
     mode: str = "files"
     apps: tuple = ()
     current: Path | None = None
+    # Chromium 디스크 캐시처럼 항목 파일이 사라져도 캐시 미스로 끝나는 곳. 앱이 실행 중이어도
+    # 열린 파일·보존 기간 검사만 통과하면 지운다. 상시 실행 앱의 캐시가 영영 남는 것을 막는다.
+    live: bool = False
+    # TCC 보호 경로. launchd의 python3에 전체 디스크 접근 권한이 없으면 항상 거부된다.
+    needs_fda: bool = False
 
 
 def canonical(path):
@@ -101,12 +108,13 @@ def rules(home, temp):
         Rule("npm 캐시", home / ".npm/_cacache", 3),
         Rule("npx 패키지", home / ".npm/_npx", 7, "children"),
         Rule("Chrome 캐시", home / "Library/Caches/Google", 3,
-             apps=("/Applications/Google Chrome.app/", "chrome-headless-shell")),
-        Rule("Slack 캐시", slack / "Cache", 3, apps=("/Slack.app/",)),
+             apps=("/Applications/Google Chrome.app/", "chrome-headless-shell"), live=True),
+        Rule("Slack 캐시", slack / "Cache", 3, apps=("/Slack.app/",), live=True),
         Rule("Slack 서비스워커 캐시", slack / "Service Worker/CacheStorage", 3,
              apps=("/Slack.app/",)),
-        Rule("Claude 웹 캐시", support / "Claude/Cache", 3, apps=("/Applications/Claude.app/",)),
-        Rule("Claude 코드 캐시", support / "Claude/Code Cache", 3, apps=("/Applications/Claude.app/",)),
+        Rule("Claude 웹 캐시", support / "Claude/Cache", 3, apps=("/Applications/Claude.app/",), live=True),
+        Rule("Claude 코드 캐시", support / "Claude/Code Cache", 3, apps=("/Applications/Claude.app/",),
+             live=True),
         Rule("CapCut 설치 파일", capcut / "Download", 3, apps=("/Applications/CapCut.app/",)),
         Rule("Bitwarden 설치 캐시", home / "Library/Caches/bitwarden-updater", 3,
              apps=("/Bitwarden.app/",)),
@@ -114,6 +122,7 @@ def rules(home, temp):
         Rule("Google 설치 캐시", support / "Google/GoogleUpdater/crx_cache", 3),
         Rule("Logi 캐시", Path("/Library/Application Support/Logi/LogiOptionsPlus/cache"), 3),
         Rule("개발 배포 캐시", home / ".cache/lazyowen-web-deploy", 7, "whole"),
+        Rule("개발 dev 배포 캐시", home / ".cache/lazyowen-web-dev-deploy", 7, "whole"),
         Rule("개발 검증 캐시", home / ".cache", 7, "validation"),
         Rule("임시 빌드", Path("/private/tmp/studio-sandbox/app/.next"), 7, "whole"),
         Rule("Claude 임시 작업", Path(f"/private/tmp/claude-{os.getuid()}"), 7, "sessions"),
@@ -125,10 +134,15 @@ def rules(home, temp):
              current=home / ".codex/packages/standalone/current"),
         Rule("Codex 데몬 구버전", home / ".codex/packages/app-server-daemon/releases", 7, "versions",
              current=home / ".codex/packages/app-server-daemon/current"),
-        Rule("휴지통", home / ".Trash", 30, "trash"),
+        Rule("휴지통", home / ".Trash", 30, "trash", needs_fda=True),
     ]
     if temp:
-        result.append(Rule("Finder 임시 영상", temp / "TemporaryItems", 7, "videos"))
+        result.append(Rule("Finder 임시 영상", temp / "TemporaryItems", 7, "videos", needs_fda=True))
+        # Chrome이 실행마다 만드는 앱 복제본. 강제 종료된 자동화 Chrome이 지우지 못하고 남긴다.
+        # APFS clone이라 평소엔 작지만 Chrome 업데이트 후엔 옛 버전 블록을 붙잡는다.
+        # 실행 중인 Chrome의 복제본은 lsof에 열린 실행 파일(txt)로 잡혀 보호된다.
+        result.append(Rule("Chrome 앱 복제본", temp.parent / "X/com.google.Chrome.code_sign_clone", 1,
+                           "children"))
     return result
 
 
@@ -239,7 +253,7 @@ def clean(rule_list, processes, now, apply=False, trash_seen=None):
     report = {"groups": {}, "samples": [], "errors": [], "candidate_bytes": 0, "removed_bytes": 0}
     for rule in rule_list:
         group = report["groups"].setdefault(rule.name, {"removed": 0, "bytes": 0, "eligible": 0, "kept": Counter()})
-        if processes.app_running(rule.apps):
+        if not rule.live and processes.app_running(rule.apps):
             group["kept"]["앱 실행 중"] += 1
             continue
         try:
@@ -269,7 +283,7 @@ def clean(rule_list, processes, now, apply=False, trash_seen=None):
                         report["samples"].append({"group": rule.name, "path": str(path), "bytes": size})
                     if apply:
                         processes.refresh()
-                        if processes.app_running(rule.apps):
+                        if not rule.live and processes.app_running(rule.apps):
                             group["kept"]["앱 실행 중"] += 1
                             continue
                         # 시간이 긴 스캔 뒤 mtime/ctime·열린 inode를 다시 검사한다.
@@ -289,6 +303,10 @@ def clean(rule_list, processes, now, apply=False, trash_seen=None):
                     if isinstance(error, OSError) and len(report["errors"]) < 20:
                         report["errors"].append(f"{rule.name}: {type(error).__name__}")
         except (OSError, ValueError) as error:
+            if isinstance(error, PermissionError) and rule.needs_fda:
+                # 사용자가 권한을 주기 전까지 매번 같은 거부라 실패로 세지 않고 보존 사유로만 알린다.
+                group["kept"]["전체 디스크 접근 권한 필요"] += 1
+                continue
             group["kept"][str(error) if isinstance(error, ValueError) else type(error).__name__] += 1
             if isinstance(error, OSError) and len(report["errors"]) < 20:
                 report["errors"].append(f"{rule.name}: {type(error).__name__}")
@@ -339,8 +357,9 @@ def notification(report):
     if report.get("errors") or report.get("fatal"):
         lines.append("확인 필요: " + "; ".join([report.get("fatal", "")] + report["errors"]).strip("; "))
     lines.append("매일 04:30(맥 현지 시각) · 원본/프로젝트/대화/DB 제외")
-    if report["free_after"] < 10 * 1024**3:
-        lines.append("⚠ 여유 공간 10GiB 미만 — 보존 자료의 아카이브 검토 필요")
+    if report["free_after"] < LOW_FREE:
+        lines.append(f"⚠ 여유 공간 {LOW_FREE // 1024**3}GiB 미만 — 15GB 아래면 macOS가 앱을 강제 종료한다. "
+                     "보존 자료의 아카이브 검토 필요")
     return "\n".join(lines)
 
 

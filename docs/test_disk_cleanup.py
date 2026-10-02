@@ -219,6 +219,40 @@ class CleanupTests(unittest.TestCase):
         self.assertIn("일부 완료", message)
         self.assertIn("휴지통: PermissionError", message)
 
+    def test_live_cache_cleaned_while_owner_app_runs(self):
+        old = self.file("cache/old-entry")
+        held = self.file("cache/open-entry")
+        new = self.file("cache/new-entry", recent=True)
+        self.process = gc.Processes("/Applications/Owner.app/main", [str(held)])
+        self.run_rule(gc.Rule("cache", old.parent, 3, apps=("/Applications/Owner.app/",), live=True))
+        self.assertFalse(old.exists())
+        self.assertTrue(held.exists())
+        self.assertTrue(new.exists())
+
+    def test_tcc_denial_is_kept_reason_not_error(self):
+        p = self.file("trash/item")
+        rule = gc.Rule("trash", p.parent, 30, "trash", needs_fda=True)
+        with patch.object(gc.Path, "iterdir", side_effect=PermissionError):
+            report, _ = self.run_rule(rule)
+        self.assertEqual(report["errors"], [])
+        self.assertEqual(report["groups"]["trash"]["kept"]["전체 디스크 접근 권한 필요"], 1)
+        with patch.object(gc.Path, "iterdir", side_effect=PermissionError):
+            report, _ = self.run_rule(gc.Rule("cache", p.parent, 3, "children"))
+        self.assertEqual(report["errors"], ["cache: PermissionError"])
+
+    def test_chrome_clone_rule_is_beside_user_temp(self):
+        temp = self.root / "folders/xx/T"
+        roots = {rule.name: rule.root for rule in gc.rules(self.root / "home", temp)}
+        self.assertEqual(roots["Chrome 앱 복제본"],
+                         self.root / "folders/xx/X/com.google.Chrome.code_sign_clone")
+
+    def test_low_free_space_warns_before_macos_purge(self):
+        report = {"finished": "test", "free_before": 0, "free_after": 13 * 1024**3,
+                  "groups": {}, "removed_bytes": 0, "errors": []}
+        self.assertIn("⚠ 여유 공간 20GiB 미만", gc.notification(report))
+        report["free_after"] = 25 * 1024**3
+        self.assertNotIn("⚠", gc.notification(report))
+
 
 if __name__ == "__main__":
     unittest.main()
