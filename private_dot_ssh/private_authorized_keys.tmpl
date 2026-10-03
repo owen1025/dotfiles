@@ -30,6 +30,8 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOvoRNWC3s7Z2CuP6xU5nejfA3bf7hlIh1yP6GYi9mbq
 {{- if and (eq .chezmoi.os "darwin") (eq .chezmoi.hostname "Owenui-Macmini") }}
 # studio (Linux VM, 100.116.152.109) — administers this Mac mini over Tailscale
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP/xLX1a3KXmyUBXCN/QbbibgtTNLV6/UlXBWV7vck5M studio-linux
+# studio M6 — studio-th의 inbox 동기화 설정·상태 확인 (2026-10-03)
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII5EbG0gK37lesF2+Sm7XDmNrRPA8v5kvSrAuq+DgxEj studio-m6
 {{- end }}
 {{- if and (eq .chezmoi.os "darwin") (eq .chezmoi.hostname "owen-lolui-Macmini") }}
 # studio M4 (Owenui-Macmini) — 2026-10 M6 이관 기간 이 맥을 관리한다. 이관 완료(구 맥 정리) 뒤 제거
