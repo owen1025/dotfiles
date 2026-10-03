@@ -1,0 +1,170 @@
+#!/usr/bin/env python3
+"""macOS inbox 전용 Syncthing: init, pair DEVICE_ID TAILSCALE_IP, status.
+
+기존 Syncthing의 설정·인증서·동기화 폴더는 사용하지 않는다.
+장치 인증서와 API 키는 런타임에 생성하며 dotfiles에 저장하지 않는다.
+"""
+import argparse
+import ipaddress
+import json
+import os
+from pathlib import Path
+import plistlib
+import shutil
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+import xml.etree.ElementTree as ET
+
+HOME = Path.home()
+STATE = HOME / "Library/Application Support/Syncthing-Inbox"
+CONFIG = STATE / "config.xml"
+INBOX = HOME / "Desktop/inbox"
+LABEL = "com.owen.syncthing-inbox"
+PLIST = HOME / "Library/LaunchAgents" / (LABEL + ".plist")
+BASE = "http://127.0.0.1:8385/rest/"
+FOLDER = "desktop-inbox"
+
+
+def api(endpoint, data=None, method=None):
+    key = ET.parse(CONFIG).getroot().findtext("gui/apikey")
+    request = urllib.request.Request(
+        BASE + endpoint,
+        data=None if data is None else json.dumps(data).encode(),
+        headers={"X-API-Key": key, "Content-Type": "application/json"},
+        method=method,
+    )
+    with urllib.request.urlopen(request, timeout=15) as response:
+        body = response.read()
+    return json.loads(body) if body else None
+
+
+def initialize():
+    binary = shutil.which("syncthing") or "/opt/homebrew/bin/syncthing"
+    if not Path(binary).is_file():
+        raise RuntimeError("먼저 brew install syncthing을 실행하세요.")
+    INBOX.mkdir(parents=True, exist_ok=True)
+    if INBOX.is_symlink():
+        raise RuntimeError("inbox가 심링크입니다. 실제 폴더를 확인하세요.")
+    STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if not CONFIG.exists():
+        subprocess.run([binary, "generate", "--home", str(STATE)], check=True,
+                       stdout=subprocess.DEVNULL)
+        tree = ET.parse(CONFIG)
+        root = tree.getroot()
+        # 새 인스턴스의 기본 Sync 폴더가 활성화되지 않도록 시작 전에 제거한다.
+        for folder in root.findall("folder"):
+            root.remove(folder)
+        root.find("gui/address").text = "127.0.0.1:8385"
+        options = root.find("options")
+        for item in options.findall("listenAddress"):
+            options.remove(item)
+        ET.SubElement(options, "listenAddress").text = "tcp://0.0.0.0:22001"
+        for name, value in {
+            "globalAnnounceEnabled": "false", "localAnnounceEnabled": "false",
+            "relaysEnabled": "false", "natEnabled": "false",
+            "startBrowser": "false", "urAccepted": "-1",
+        }.items():
+            item = options.find(name)
+            if item is None:
+                item = ET.SubElement(options, name)
+            item.text = value
+        tree.write(CONFIG, encoding="utf-8", xml_declaration=True)
+    service = {
+        "Label": LABEL,
+        "ProgramArguments": [binary, "serve", "--home", str(STATE),
+                             "--no-browser", "--no-restart",
+                             "--log-file", str(STATE / "syncthing.log"),
+                             "--log-max-size", "1048576", "--log-max-old-files", "2"],
+        "RunAtLoad": True, "KeepAlive": True, "ThrottleInterval": 10,
+        "EnvironmentVariables": {"HOME": str(HOME),
+                                 "PATH": "/opt/homebrew/bin:/usr/bin:/bin"},
+    }
+    PLIST.parent.mkdir(parents=True, exist_ok=True)
+    encoded = plistlib.dumps(service)
+    if not PLIST.exists() or PLIST.read_bytes() != encoded:
+        PLIST.write_bytes(encoded)
+    domain = "gui/" + str(os.getuid())
+    loaded = subprocess.run(["launchctl", "print", domain + "/" + LABEL],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if loaded.returncode:
+        subprocess.run(["launchctl", "bootstrap", domain, str(PLIST)], check=True)
+    for _ in range(30):
+        try:
+            print(json.dumps({"deviceID": api("system/status")["myID"],
+                              "inbox": str(INBOX)}, ensure_ascii=False))
+            return
+        except (OSError, urllib.error.URLError):
+            time.sleep(1)
+    raise RuntimeError("Syncthing 시작 실패: " + str(STATE / "syncthing.log"))
+
+
+def pair(device_id, address):
+    ip = ipaddress.ip_address(address)
+    if ip not in ipaddress.ip_network("100.64.0.0/10"):
+        raise ValueError("상대 맥의 Tailscale IPv4 주소를 지정하세요.")
+    own = api("system/status")["myID"]
+    if own == device_id:
+        raise ValueError("두 맥의 장치 ID가 같습니다. 인증서를 복사하면 안 됩니다.")
+    devices = api("config/devices")
+    device = next((d for d in devices if d["deviceID"] == device_id), None)
+    if device is None:
+        device = api("config/defaults/device")
+    device.update(deviceID=device_id, name="inbox-" + address,
+                  addresses=["tcp://" + address + ":22001"],
+                  allowedNetworks=["100.64.0.0/10"], autoAcceptFolders=False)
+    api("config/devices", device, "POST")
+    folders = api("config/folders")
+    folder = next((f for f in folders if f["id"] == FOLDER), None)
+    if folder is None:
+        folder = api("config/defaults/folder")
+    elif Path(folder["path"]).expanduser() != INBOX:
+        raise RuntimeError("기존 desktop-inbox의 경로가 다릅니다.")
+    other_peers = {d["deviceID"] for d in folder.get("devices", [])} - {own, device_id}
+    if other_peers:
+        raise RuntimeError("inbox에 다른 공유 장치가 있습니다. 설정을 확인하세요.")
+    folder.update(id=FOLDER, label="Desktop inbox", path=str(INBOX),
+                  type="sendreceive", devices=[{"deviceID": own}, {"deviceID": device_id}],
+                  fsWatcherEnabled=True, fsWatcherDelayS=2, rescanIntervalS=300)
+    api("config/folders", folder, "POST")
+    print("inbox 양방향 동기화 설정 완료")
+
+
+def status():
+    result = {"deviceID": api("system/status")["myID"], "inbox": str(INBOX)}
+    result["connections"] = {
+        key: {name: value.get(name) for name in ("connected", "address")}
+        for key, value in api("system/connections")["connections"].items()
+    }
+    if any(f["id"] == FOLDER for f in api("config/folders")):
+        data = api("db/status?folder=" + FOLDER)
+        result["folder"] = {key: data.get(key) for key in (
+            "state", "globalFiles", "localFiles", "globalBytes", "localBytes",
+            "needFiles", "needBytes", "pullErrors", "invalid")}
+        result["errors"] = api("folder/errors?folder=" + FOLDER)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("init")
+    pairing = commands.add_parser("pair")
+    pairing.add_argument("device_id")
+    pairing.add_argument("tailscale_ip")
+    commands.add_parser("status")
+    args = parser.parse_args()
+    if sys.platform != "darwin":
+        parser.error("macOS 전용 도구입니다.")
+    if args.command == "init":
+        initialize()
+    elif args.command == "pair":
+        pair(args.device_id, args.tailscale_ip)
+    else:
+        status()
+
+
+if __name__ == "__main__":
+    main()
