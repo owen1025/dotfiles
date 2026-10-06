@@ -1,0 +1,684 @@
+#!/usr/bin/env python3
+"""sys-usage — 셸 시작 패널 맨 위의 시스템 자원 요약(CPU · RAM · GPU · DISK).
+
+표기는 btop·fastfetch·duf 가 쓰는 "미터 행"을 따른다: 고정 폭 이름 + 임계값 색 게이지 + 오른쪽 정렬 %
++ 절댓값. 이름·게이지·% 열은 바로 아래 claude-usage(bars) 패널과 같은 칸에 맞춰 한 화면이 한 표처럼
+읽히게 했다. 색 임계값도 그 패널과 같은 50·75·90%(glances 의 기본 50·70·90 과 같은 계열).
+  RAM   사용률만으로는 색을 정하지 않는다 — macOS 는 커널 메모리 압박 수준(Activity Monitor 의
+        초록·노랑·빨강)이 진짜 신호라 압박이 '주의'면 주황, '위험'이면 빨강으로 끌어올린다.
+  DISK  게이지는 사용률로 칠하고, duf 처럼 여유 공간 숫자를 따로 칠한다 — 여유가 min(20GiB, 전체의
+        10%) 미만이면 빨강, 그 두 배 미만이면 주황. 20GiB 는 disk-cleanup 이 Slack 경고를 보내는 선이고,
+        10% 상한은 작은 서버 디스크(30G 에 12G 여유)가 멀쩡한데 빨갛게 뜨지 않게 한다.
+
+측정 방식(2026-10-06 M6 맥 미니 실측으로 골랐다):
+  CPU   커널 누적 틱의 델타 — top·btop 과 같은 값. 직전 셸이 3–60초 안에 남긴 틱 샘플이 있으면
+        기다리지 않고 그 구간 평균을 쓰고, 없을 때만 0.1초 샘플링한다(SYS_USAGE_CPU_WINDOW).
+        버린 대안: `ps -A -o %cpu` 합산은 실측의 절반(23% vs top 53%)으로 나왔고,
+        fastfetch cpuusage 는 셸마다 0.22초를 막는다. 부하(load average)는 참고값으로 옆에 둔다.
+  RAM   macOS = Activity Monitor 의 "사용된 메모리"(앱 + 와이어드 + 압축, 파일 캐시 제외).
+        Linux = MemTotal − MemAvailable(free·htop 의 used).
+  GPU   macOS = IOAccelerator 의 "Device Utilization %"(sudo 불필요 — metop·fastfetch 와 같은 소스).
+        Linux = nvidia-smi 또는 AMD sysfs(gpu_busy_percent). GPU 를 못 찾으면 행을 생략한다.
+  DISK  statvfs. macOS 는 데이터 볼륨(/System/Volumes/Data — `/` 는 읽기 전용 시스템 스냅샷).
+        추가 마운트: SYS_USAGE_DISKS="/mnt/data:/Volumes/X" (같은 파일시스템이면 한 줄로 친다).
+
+셸 시작을 막지 않는다: 파이썬 표준 라이브러리만 쓰고(macOS 는 ctypes 로 libSystem 을 직접 불러
+sysctl·vm_stat 을 fork 하지 않는다), 하위 프로세스는 GPU 조회 하나, `--startup` 은 2초 알람 +
+어떤 오류든 조용히 넘어간다. 터미널에 질의(OSC·DA)를 보내지 않는다 — 출력만 한다.
+"""
+from __future__ import annotations
+
+import argparse
+import glob
+import json
+import os
+import re
+import shutil
+import signal
+import socket
+import struct
+import subprocess
+import sys
+import time
+import unicodedata
+
+HOME = os.path.expanduser("~")
+CACHE_DIR = os.environ.get(
+    "SYS_USAGE_CACHE",
+    os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.join(HOME, ".cache"), "sys-usage"),
+)
+CPU_CACHE = os.path.join(CACHE_DIR, "cpu.json")
+CPU_WINDOW = float(os.environ.get("SYS_USAGE_CPU_WINDOW", "0.1"))   # 재사용할 샘플이 없을 때의 측정 구간(초)
+CPU_REUSE = (3.0, 60.0)       # 이 범위로 오래된 직전 샘플은 대기 없이 델타에 쓴다(너무 짧으면 셸 기동 자체가 섞인다)
+DISK_LOW_GIB = float(os.environ.get("SYS_USAGE_DISK_LOW_GB", "20"))
+STARTUP_DEADLINE = 2          # 초. 넘기면 아무것도 찍지 않고 끝낸다
+NAME_W = 10                   # claude-usage bars 의 이름 열("주간 Fable")과 같은 폭 → 게이지·% 열이 위아래로 맞는다
+GIB = 1024 ** 3
+IS_MAC = sys.platform == "darwin"
+PRESSURE = {1: "normal", 2: "warn", 4: "critical"}   # kern.memorystatus_vm_pressure_level
+
+
+# ─────────────────────────────────────────── macOS: libSystem 직접 호출
+
+
+class Mach:
+    """sysctlbyname · host_statistics(64) — fork 없이 커널 값을 읽는다."""
+
+    def __init__(self):
+        import ctypes
+        self.ct = ctypes
+        self.lib = ctypes.CDLL("/usr/lib/libSystem.B.dylib")
+        self.lib.mach_host_self.restype = ctypes.c_uint32
+        self.host = self.lib.mach_host_self()
+
+    def sysctl(self, name: str) -> bytes | None:
+        ct, key = self.ct, name.encode()
+        size = ct.c_size_t(0)
+        if self.lib.sysctlbyname(key, None, ct.byref(size), None, ct.c_size_t(0)) != 0 or not size.value:
+            return None
+        buf = ct.create_string_buffer(size.value)
+        if self.lib.sysctlbyname(key, buf, ct.byref(size), None, ct.c_size_t(0)) != 0:
+            return None
+        return buf.raw[:size.value]
+
+    def sysctl_int(self, name: str) -> int | None:
+        raw = self.sysctl(name)
+        if not raw or len(raw) not in (4, 8):
+            return None
+        return struct.unpack("<q" if len(raw) == 8 else "<i", raw)[0]
+
+    def host_stats(self, fn: str, flavor: int, count: int) -> bytes | None:
+        ct = self.ct
+        buf = (ct.c_uint32 * count)()
+        n = ct.c_uint32(count)
+        if getattr(self.lib, fn)(self.host, flavor, buf, ct.byref(n)) != 0:
+            return None
+        return bytes(buf)[: n.value * 4]
+
+
+# ─────────────────────────────────────────── CPU
+
+
+def cpu_sample(mach: Mach | None) -> list[int] | None:
+    """누적 틱. macOS = [user, system, idle, nice](uint32, 감길 수 있다),
+    Linux = /proc/stat 첫 줄의 [user nice system idle iowait irq softirq steal]."""
+    if IS_MAC:
+        raw = mach.host_stats("host_statistics", 3, 4) if mach else None   # HOST_CPU_LOAD_INFO
+        return list(struct.unpack_from("<4I", raw)) if raw and len(raw) >= 16 else None
+    try:
+        with open("/proc/stat") as f:
+            head = f.readline().split()
+    except OSError:
+        return None
+    if not head or head[0] != "cpu":
+        return None
+    vals = [int(x) for x in head[1:9]]
+    return vals + [0] * (8 - len(vals))
+
+
+def cpu_busy_pct(a: list[int], b: list[int], mac: bool | None = None) -> float | None:
+    if not a or not b or len(a) != len(b):
+        return None
+    mac = IS_MAC if mac is None else mac
+    if mac:
+        d = [(y - x) % 2 ** 32 for x, y in zip(a, b)]   # natural_t 는 길게 켜 두면 감긴다
+        idle = d[2]
+    else:
+        d = [y - x for x, y in zip(a, b)]
+        if min(d) < 0:
+            return None
+        idle = d[3] + d[4]                               # idle + iowait
+    total = sum(d)
+    if total <= 0:
+        return None
+    return max(0.0, min(100.0, 100.0 * (total - idle) / total))
+
+
+def _read_json(path: str) -> dict | None:
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def _write_json(path: str, data: dict) -> None:
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = f"{path}.{os.getpid()}.tmp"
+        with open(tmp, "w") as f:
+            json.dump(data, f)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def measure_cpu(mach: Mach | None, boot: int | None, window: float = None, now: float = None) -> dict:
+    """CPU 사용률(%)과 그 출처. 직전 셸의 샘플을 재사용할 수 있으면 0초, 아니면 window 초."""
+    window = CPU_WINDOW if window is None else window
+    now = time.time() if now is None else now
+    cur = cpu_sample(mach)
+    if cur is None:
+        return {"percent": None, "source": None}
+    prev = _read_json(CPU_CACHE)
+    age = now - prev.get("t", 0) if prev else None
+    same_boot = bool(prev) and prev.get("boot") == boot and len(prev.get("ticks") or []) == len(cur)
+    pct, source = None, None
+    if same_boot and CPU_REUSE[0] <= age <= CPU_REUSE[1]:
+        pct, source = cpu_busy_pct(prev["ticks"], cur), f"{age:.0f}s"
+    if pct is None and window > 0:
+        time.sleep(window)
+        later = cpu_sample(mach)
+        pct, source = cpu_busy_pct(cur, later), f"{window:g}s"
+        cur, now = later or cur, time.time()
+    # 3초가 안 된 샘플이 있으면 그대로 둔다 — 셸을 연달아 열어도 다음 셸이 쓸 기준점이 남는다.
+    if not (same_boot and age is not None and 0 <= age < CPU_REUSE[0]):
+        _write_json(CPU_CACHE, {"t": now, "boot": boot, "ticks": cur})
+    return {"percent": pct, "source": source}
+
+
+def cpu_model(mach: Mach | None) -> str:
+    if IS_MAC and mach:
+        raw = mach.sysctl("machdep.cpu.brand_string")
+        if raw:
+            return tidy_model(raw.split(b"\0")[0].decode(errors="replace"))
+    try:
+        with open("/proc/cpuinfo") as f:
+            for line in f:
+                key, _, val = line.partition(":")
+                if key.strip() in ("model name", "Model", "Hardware") and val.strip():
+                    return tidy_model(val.strip())
+    except OSError:
+        pass
+    return os.uname().machine
+
+
+def tidy_model(name: str) -> str:
+    """'Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz' → 'Intel Xeon E5-2680 v4'."""
+    name = re.sub(r"\((R|TM|tm)\)|\bCPU\b|@.*$|\b\d+-Core Processor\b|\bProcessor\b", " ", name)
+    return re.sub(r"\s+", " ", name).strip()
+
+
+# ─────────────────────────────────────────── 메모리
+
+
+def memory_mac(mach: Mach) -> dict | None:
+    total = mach.sysctl_int("hw.memsize")
+    page = mach.sysctl_int("hw.pagesize") or os.sysconf("SC_PAGE_SIZE")
+    raw = mach.host_stats("host_statistics64", 4, 64)                    # HOST_VM_INFO64
+    if not total or not raw or len(raw) < 144:
+        return None
+    wire = struct.unpack_from("<I", raw, 12)[0]
+    purgeable = struct.unpack_from("<I", raw, 88)[0]
+    compressor, _throttled, _external, internal = struct.unpack_from("<4I", raw, 128)
+    # Activity Monitor: 사용된 메모리 = 앱 메모리(internal − purgeable) + 와이어드 + 압축
+    used = min(total, (max(0, internal - purgeable) + wire + compressor) * page)
+    swap = mach.sysctl("vm.swapusage")                                     # xsw_usage: total, avail, used
+    swap_total, _avail, swap_used = struct.unpack_from("<3Q", swap) if swap and len(swap) >= 24 else (0, 0, 0)
+    return {"used": used, "total": total, "swap_used": swap_used, "swap_total": swap_total,
+            "pressure": PRESSURE.get(mach.sysctl_int("kern.memorystatus_vm_pressure_level"))}
+
+
+def parse_meminfo(text: str) -> dict | None:
+    kb = {}
+    for line in text.splitlines():
+        key, _, rest = line.partition(":")
+        parts = rest.split()
+        if parts and parts[0].isdigit():
+            kb[key] = int(parts[0]) * 1024
+    total = kb.get("MemTotal")
+    if not total:
+        return None
+    avail = kb.get("MemAvailable")
+    if avail is None:                                                       # 3.14 이전 커널
+        avail = kb.get("MemFree", 0) + kb.get("Buffers", 0) + kb.get("Cached", 0)
+    swap_total = kb.get("SwapTotal", 0)
+    return {"used": max(0, total - avail), "total": total,
+            "swap_used": max(0, swap_total - kb.get("SwapFree", 0)), "swap_total": swap_total,
+            "pressure": None}
+
+
+def memory_linux() -> dict | None:
+    try:
+        with open("/proc/meminfo") as f:
+            return parse_meminfo(f.read())
+    except OSError:
+        return None
+
+
+# ─────────────────────────────────────────── GPU
+
+
+def _run(cmd: list[str], timeout: float) -> str:
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
+                              stdin=subprocess.DEVNULL).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def parse_ioreg(text: str) -> list[dict]:
+    gpus = []
+    for block in text.split("+-o ")[1:]:
+        util = re.search(r'"Device Utilization %"\s*=\s*(\d+)', block)
+        if not util:
+            continue
+        model = re.search(r'"model"\s*=\s*"([^"]+)"', block)
+        cores = re.search(r'"gpu-core-count"\s*=\s*(\d+)', block)
+        gpus.append({"name": model.group(1) if model else "GPU", "percent": float(util.group(1)),
+                     "cores": int(cores.group(1)) if cores else None, "mem_used": None, "mem_total": None})
+    return gpus
+
+
+def parse_nvidia(text: str) -> list[dict]:
+    gpus = []
+    for line in text.strip().splitlines():
+        cols = [c.strip() for c in line.split(",")]
+        if len(cols) < 4:
+            continue
+        try:
+            pct = float(cols[1])
+        except ValueError:
+            pct = None
+        try:
+            used, total = float(cols[2]) * 1024 ** 2, float(cols[3]) * 1024 ** 2   # MiB
+        except ValueError:
+            used = total = None
+        gpus.append({"name": cols[0].replace("NVIDIA ", ""), "percent": pct, "cores": None,
+                     "mem_used": used, "mem_total": total})
+    return gpus
+
+
+def gpus_amd_sysfs(root: str = "/sys/class/drm") -> list[dict]:
+    gpus = []
+    for busy in sorted(glob.glob(os.path.join(root, "card*", "device", "gpu_busy_percent"))):
+        if not re.fullmatch(r"card\d+", os.path.basename(os.path.dirname(os.path.dirname(busy)))):
+            continue
+        dev = os.path.dirname(busy)
+
+        def num(name):
+            try:
+                with open(os.path.join(dev, name)) as f:
+                    return float(f.read().strip())
+            except (OSError, ValueError):
+                return None
+        gpus.append({"name": "AMD GPU", "percent": num("gpu_busy_percent"), "cores": None,
+                     "mem_used": num("mem_info_vram_used"), "mem_total": num("mem_info_vram_total")})
+    return gpus
+
+
+def gpus() -> list[dict]:
+    if os.environ.get("SYS_USAGE_GPU", "1") == "0":
+        return []
+    if IS_MAC:
+        return parse_ioreg(_run(["/usr/sbin/ioreg", "-r", "-d", "1", "-w", "0", "-c", "IOAccelerator"], 1.0))
+    found = []
+    if shutil.which("nvidia-smi"):
+        found += parse_nvidia(_run(["nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used,memory.total",
+                                    "--format=csv,noheader,nounits"], 1.5))
+    return found + gpus_amd_sysfs()
+
+
+# ─────────────────────────────────────────── 디스크 · 가동시간
+
+
+def disk(path: str, label: str) -> dict | None:
+    try:
+        st = os.statvfs(path)
+        dev = os.stat(path).st_dev
+    except OSError:
+        return None
+    total = st.f_blocks * st.f_frsize
+    if total <= 0:
+        return None
+    used = (st.f_blocks - st.f_bfree) * st.f_frsize
+    free = st.f_bavail * st.f_frsize
+    # df 의 Use% 와 같은 정의(예약 블록 제외).
+    pct = 100.0 * used / (used + free) if used + free else None
+    return {"label": label, "path": path, "dev": dev, "used": used, "free": free, "total": total, "percent": pct}
+
+
+def disks() -> list[dict]:
+    main = "/System/Volumes/Data" if IS_MAC and os.path.isdir("/System/Volumes/Data") else "/"
+    out, seen = [], set()
+    extra = [p for p in os.environ.get("SYS_USAGE_DISKS", "").split(":") if p]
+    for path in [main] + extra:
+        d = disk(os.path.expanduser(path), "DISK" if path == main else (os.path.basename(path.rstrip("/")) or path))
+        if d and d["dev"] not in seen:
+            seen.add(d["dev"])
+            out.append(d)
+    return out
+
+
+def boot_time(mach: Mach | None) -> int | None:
+    if IS_MAC and mach:
+        raw = mach.sysctl("kern.boottime")                                  # struct timeval
+        return struct.unpack_from("<q", raw)[0] if raw and len(raw) >= 8 else None
+    try:
+        with open("/proc/stat") as f:
+            for line in f:
+                if line.startswith("btime "):
+                    return int(line.split()[1])
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+# ─────────────────────────────────────────── 수집
+
+
+def collect(window: float = None) -> dict:
+    mach = None
+    if IS_MAC:
+        try:
+            mach = Mach()
+        except OSError:
+            mach = None
+    boot = boot_time(mach)
+    cpu = measure_cpu(mach, boot, window)
+    try:
+        load = list(os.getloadavg())
+    except OSError:
+        load = None
+    mem = memory_mac(mach) if IS_MAC and mach else (None if IS_MAC else memory_linux())
+    return {
+        "host": socket.gethostname().split(".")[0],
+        "uptime": time.time() - boot if boot else None,
+        "cpu": {**cpu, "cores": os.cpu_count(), "model": cpu_model(mach), "load": load},
+        "mem": mem,
+        "gpus": gpus(),
+        "disks": disks(),
+    }
+
+
+# ─────────────────────────────────────────── 폭 · 색 (claude-usage 와 같은 규칙·같은 색)
+
+
+def dwidth(text: str) -> int:
+    total = 0
+    for ch in text:
+        if unicodedata.combining(ch):
+            continue
+        total += 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+    return total
+
+
+def pad(text: str, width: int, align: str = "<") -> str:
+    gap = max(0, width - dwidth(text))
+    return " " * gap + text if align == ">" else text + " " * gap
+
+
+def ellipsize(text: str, width: int) -> str:
+    if width <= 0:
+        return ""
+    if dwidth(text) <= width:
+        return text
+    out = ""
+    for ch in text:
+        if dwidth(out + ch) > width - 1:
+            break
+        out += ch
+    return out + "…"
+
+
+class Ink:
+    def __init__(self, enabled: bool):
+        self.on = enabled
+
+    def _w(self, code: str, text: str) -> str:
+        return f"\033[{code}m{text}\033[0m" if self.on and text else text
+
+    def dim(self, t):    return self._w("2", t)
+    def bold(self, t):   return self._w("1", t)
+    def green(self, t):  return self._w("38;5;71", t)
+    def yellow(self, t): return self._w("38;5;179", t)
+    def orange(self, t): return self._w("38;5;173", t)
+    def red(self, t):    return self._w("38;5;167", t)
+    def blue(self, t):   return self._w("38;5;110", t)
+    def track(self, t):  return self._w("38;5;238", t)
+
+    def level(self, lvl: int | None, text: str) -> str:
+        if lvl is None:
+            return self.dim(text)
+        return (self.green, self.yellow, self.orange, self.red)[max(0, min(3, lvl))](text)
+
+
+def level_of(pct: float | None) -> int | None:
+    if pct is None:
+        return None
+    return 3 if pct >= 90 else 2 if pct >= 75 else 1 if pct >= 50 else 0
+
+
+def gauge(ink: Ink, pct: float | None, lvl: int | None, width: int) -> str:
+    if pct is None:
+        return ink.track("░" * width)
+    filled = max(0, min(width, int(round(width * min(pct, 100) / 100))))
+    if pct >= 0.5 and filled == 0:
+        filled = 1                       # 1% 도 눈에 보이게
+    return ink.level(lvl, "█" * filled) + ink.track("░" * (width - filled))
+
+
+def size_text(n: float | None) -> str:
+    if n is None:
+        return "?"
+    g = n / GIB
+    if g >= 100:
+        return f"{g:.0f}G"
+    if g >= 1:
+        return f"{g:.1f}G".replace(".0G", "G")
+    return f"{n / 1024 ** 2:.0f}M"
+
+
+def uptime_text(sec: float | None) -> str:
+    if not sec or sec < 0:
+        return ""
+    d, rem = divmod(int(sec), 86400)
+    h, m = rem // 3600, rem % 3600 // 60
+    return f"가동 {d}일 {h}시간" if d else (f"가동 {h}시간 {m}분" if h else f"가동 {m}분")
+
+
+PRESSURE_TEXT = {"normal": ("정상", 0), "warn": ("주의", 2), "critical": ("위험", 3)}
+
+
+# ─────────────────────────────────────────── 행 모델
+
+
+def rows_of(stats: dict, wide: bool) -> list[dict]:
+    """렌더러 공통 행: name, pct, lvl, detail=[(텍스트, 색 레벨|None)], short=[…](좁은 폭용)."""
+    rows = []
+    cpu = stats.get("cpu") or {}
+    load = cpu.get("load")
+    detail = []
+    if cpu.get("cores"):
+        detail.append((f"{cpu['cores']}코어", None))
+    if load:
+        detail.append((f"부하 {load[0]:.1f} · {load[1]:.1f} · {load[2]:.1f}" + (" (1·5·15분)" if wide else ""), None))
+    rows.append({"name": "CPU", "pct": cpu.get("percent"), "lvl": level_of(cpu.get("percent")),
+                 "detail": detail, "short": [(f"부하 {load[0]:.1f}", None)] if load else []})
+
+    mem = stats.get("mem")
+    if mem:
+        pct = 100.0 * mem["used"] / mem["total"] if mem.get("total") else None
+        lvl = level_of(pct)
+        detail = [(f"{size_text(mem['used'])} / {size_text(mem['total'])}", None)]
+        short = []
+        p = PRESSURE_TEXT.get(mem.get("pressure"))
+        if p:
+            lvl = max(lvl or 0, p[1])
+            detail.append((f"압박 {p[0]}", p[1] if p[1] else None))
+            if p[1]:
+                short.append((f"압박 {p[0]}", p[1]))
+        if mem.get("swap_used"):
+            detail.append((f"스왑 {size_text(mem['swap_used'])}", None))
+        rows.append({"name": "RAM", "pct": pct, "lvl": lvl, "detail": detail,
+                     "short": short or [(f"{size_text(mem['used'])} / {size_text(mem['total'])}", None)]})
+
+    model = cpu.get("model") or ""
+    for i, gpu in enumerate(stats.get("gpus") or []):
+        detail = []
+        if gpu.get("name") and gpu["name"] != model:
+            detail.append((gpu["name"], None))
+        if gpu.get("cores"):
+            detail.append((f"{gpu['cores']}코어", None))
+        if gpu.get("mem_total"):
+            detail.append((f"VRAM {size_text(gpu.get('mem_used'))} / {size_text(gpu['mem_total'])}", None))
+        name = "GPU" if len(stats["gpus"]) == 1 else f"GPU{i}"
+        rows.append({"name": name, "pct": gpu.get("percent"), "lvl": level_of(gpu.get("percent")),
+                     "detail": detail, "short": detail[:1]})
+
+    for d in stats.get("disks") or []:
+        lvl = level_of(d.get("percent"))
+        low = min(DISK_LOW_GIB * GIB, d["total"] * 0.10)
+        free_lvl = 3 if d["free"] < low else (2 if d["free"] < 2 * low else None)
+        free = (f"여유 {size_text(d['free'])}", free_lvl)
+        rows.append({"name": d["label"], "pct": d.get("percent"), "lvl": lvl,
+                     "detail": [(f"{size_text(d['used'])} / {size_text(d['total'])}", None), free],
+                     "short": [free]})
+    return rows
+
+
+def detail_text(ink: Ink, parts: list, room: int) -> str:
+    """' · ' 로 잇되 room 칸을 넘기면 뒤에서부터 덜어 내고, 마지막 하나는 말줄임한다."""
+    parts = list(parts)
+    while parts and dwidth(" · ".join(t for t, _ in parts)) > room and len(parts) > 1:
+        parts.pop()
+    if not parts or room < 4:
+        return ""
+    sep = ink.dim(" · ")
+    out = []
+    for text, lvl in parts:
+        text = ellipsize(text, room) if len(parts) == 1 else text
+        out.append(ink.level(lvl, text) if lvl is not None else ink.dim(text))
+    return sep.join(out)
+
+
+def strip_ansi(text: str) -> str:
+    return re.sub(r"\033\[[0-9;]*m", "", text)
+
+
+def pct_text(pct: float | None) -> str:
+    return "  ?%" if pct is None else f"{int(round(pct)):>3d}%"
+
+
+def header_bits(stats: dict) -> list[str]:
+    cpu = stats.get("cpu") or {}
+    bits = [stats.get("host") or "", cpu.get("model") or "", uptime_text(stats.get("uptime"))]
+    return [b for b in bits if b]
+
+
+# ─────────────────────────────────────────── 렌더러
+
+
+def render(stats: dict, style: str, ink: Ink, width: int) -> str:
+    if style == "compact":
+        return render_compact(stats, ink, width)
+    if style == "panel":
+        return render_panel(stats, ink, width)
+    return render_bars(stats, ink, width)
+
+
+def render_bars(stats: dict, ink: Ink, width: int) -> str:
+    # 게이지 폭·들여쓰기·이름 열은 claude-usage render_bars 와 같다 → 아래 패널과 열이 맞는다.
+    bar_w = 24 if width >= 96 else (18 if width >= 84 else (12 if width >= 72 else 8))
+    head = " · ".join(header_bits(stats))
+    out = [f" {ink.bold('시스템')}  {ink.dim('·')}  {ink.dim(ellipsize(head, max(10, width - 12)))}",
+           " " + ink.dim("─" * max(20, min(width - 2, 74)))]
+    for row in rows_of(stats, wide=width >= 96):
+        lead = f"   {pad(row['name'], NAME_W)}  "
+        body = f"{gauge(ink, row['pct'], row['lvl'], bar_w)}  {ink.level(row['lvl'], pct_text(row['pct']))}"
+        room = width - dwidth(lead) - bar_w - 2 - 4 - 2 - 1
+        detail = detail_text(ink, row["detail"] if width >= 84 else row["short"], room)
+        out.append(lead + body + ("  " + detail if detail else ""))
+    return "\n".join(out)
+
+
+def render_panel(stats: dict, ink: Ink, width: int) -> str:
+    inner = min(max(width - 4, 56), 78)
+    title = "시스템"
+    right = ellipsize(" · ".join(header_bits(stats)), max(8, inner - dwidth(title) - 6))
+    fill = max(1, inner - dwidth(title) - dwidth(right) - 4)
+    out = [ink.dim("╭─ ") + ink.bold(title) + " " + ink.dim("─" * fill) + " " + ink.dim(right) + ink.dim(" ─╮")]
+    bar_w = 16 if inner >= 70 else 10
+    for row in rows_of(stats, wide=False):
+        lead = f"  {pad(row['name'], 4)}  "
+        room = inner - dwidth(lead) - bar_w - 1 - 4 - 2
+        detail = detail_text(ink, row["detail"], room)
+        body = (f"{lead}{gauge(ink, row['pct'], row['lvl'], bar_w)} {ink.level(row['lvl'], pct_text(row['pct']))}"
+                + ("  " + detail if detail else ""))
+        out.append(ink.dim("│") + " " + body + " " * max(0, inner - dwidth(strip_ansi(body))) + ink.dim(" │"))
+    out.append(ink.dim("╰" + "─" * (inner + 2) + "╯"))
+    return "\n".join(out)
+
+
+def render_compact(stats: dict, ink: Ink, width: int) -> str:
+    """한 줄. 폭이 모자라면 게이지를 줄이고, 그다음 경고 메모(압박·여유 부족)를 뺀다."""
+    rows = rows_of(stats, wide=False)
+    lead = " " + ink.bold(ink.blue(pad("시스템", 8)))
+    for bar_w, hint in ((10, True), (8, True), (6, True), (6, False), (4, False), (0, False)):
+        segs = []
+        for row in rows:
+            seg = ink.dim(row["name"]) + " "
+            if bar_w:
+                seg += gauge(ink, row["pct"], row["lvl"], bar_w) + " "
+            seg += ink.level(row["lvl"], pct_text(row["pct"]))
+            note = next(((t, lvl) for t, lvl in row["short"] if lvl), None) if hint else None
+            if note:
+                seg += " " + ink.level(note[1], note[0])
+            segs.append(seg)
+        line = lead + f" {ink.dim('│')} ".join(segs)
+        if dwidth(strip_ansi(line)) <= width or not bar_w:
+            return line
+    return ""
+
+
+# ─────────────────────────────────────────── 진입점
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="시스템 자원 요약 (CPU · RAM · GPU · DISK)")
+    ap.add_argument("--style", choices=("bars", "panel", "compact"),
+                    default=os.environ.get("SYS_USAGE_STYLE") or os.environ.get("CLAUDE_USAGE_STYLE") or "bars")
+    ap.add_argument("--width", type=int, default=0)
+    ap.add_argument("--startup", action="store_true", help="셸 시작용: 오류·지연 시 아무것도 찍지 않는다")
+    ap.add_argument("--sample", action="store_true", help="직전 샘플을 재사용하지 않고 CPU 를 새로 잰다")
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--no-color", action="store_true")
+    args = ap.parse_args()
+
+    if args.startup:
+        signal.signal(signal.SIGALRM, lambda *_: sys.exit(0))
+        signal.alarm(STARTUP_DEADLINE)
+    try:
+        if args.sample:
+            try:
+                os.unlink(CPU_CACHE)
+            except OSError:
+                pass
+        stats = collect()
+        if args.json:
+            json.dump(stats, sys.stdout, ensure_ascii=False, indent=2)
+            print()
+            return 0
+        width = args.width or (shutil.get_terminal_size((100, 24)).columns)
+        ink = Ink(not args.no_color and not os.environ.get("NO_COLOR")
+                  and (sys.stdout.isatty() or os.environ.get("CLICOLOR_FORCE") == "1"))
+        text = render(stats, args.style, ink, width)
+    except Exception:
+        if args.startup:
+            return 0
+        raise
+    finally:
+        if args.startup:
+            signal.alarm(0)
+    if text:
+        # bars·panel 은 아래 Claude 패널과 빈 줄 하나로 띄운다. compact 는 한 줄씩 붙인다.
+        print(text + ("\n" if args.startup and args.style != "compact" else ""))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(130)

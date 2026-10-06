@@ -483,11 +483,20 @@ ss-analyze() {
 }
 
 # ####################### Welcome Screen #######################
-# fastfetch: pretty system info on new interactive shells
-# Skip inside tmux panes (only shown on the outer terminal) and for non-interactive shells
-if [[ -o interactive ]] && [[ -z "$TMUX" ]] && [[ -z "$FASTFETCH_SHOWN" ]] && command -v fastfetch &>/dev/null; then
+# fastfetch(로고 + 사양 전체)는 옵트인 — 아래 시스템 패널과 RAM·디스크가 겹치고 패널을 화면 밖으로 밀어낸다.
+#   켜기 SHELL_WELCOME_FASTFETCH=1 (tmux 밖 첫 셸에서만)
+if [[ -o interactive ]] && [[ "${SHELL_WELCOME_FASTFETCH:-0}" == 1 ]] && [[ -z "$TMUX" ]] && [[ -z "$FASTFETCH_SHOWN" ]] && command -v fastfetch &>/dev/null; then
   fastfetch
   export FASTFETCH_SHOWN=1
+fi
+
+# 새 셸 맨 위 패널: ① 시스템 자원(sys-usage — CPU·RAM·GPU·DISK) → ② Claude·ChatGPT 사용량(아래 claude-accounts).
+# bars 스타일에서 두 패널의 이름·게이지·% 열이 같은 칸에 맞는다. tmux pane 마다 그 순간 상태를 찍는다.
+# 비용: 직전 셸 CPU 샘플(3–60초)을 재사용하면 ~40ms, 아니면 0.1초 샘플링 포함 ~150ms. 2초 넘으면 조용히 포기.
+#   끄기 SYS_USAGE_STARTUP=0 · 스타일 SYS_USAGE_STYLE(없으면 CLAUDE_USAGE_STYLE) · 즉석 확인 `sys-usage`
+# 터미널이 아닌 stdout(`zsh -i -c …` 자동화)과 Claude Code 가 띄우는 셸에서는 찍지 않는다.
+if [[ -o interactive ]] && [[ -t 1 ]] && [[ -z "$CLAUDECODE" ]] && [[ "${SYS_USAGE_STARTUP:-1}" == 1 ]] && (( $+commands[sys-usage] )); then
+  command sys-usage --startup --style "${SYS_USAGE_STYLE:-${CLAUDE_USAGE_STYLE:-bars}}" --width "${COLUMNS:-100}" 2>/dev/null
 fi
 
 # Claude Code 다중 계정(claude / claude2 / claude3) + 계정별 사용량 패널
