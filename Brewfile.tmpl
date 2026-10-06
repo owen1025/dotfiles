@@ -123,20 +123,23 @@ brew "uv"
 brew "zippoxer/tap/recall"
 {{ if eq .chezmoi.os "darwin" -}}
 # 2026-10-02 studio 서버(M6 이관)가 쓰는데 Brewfile 밖에 있던 것 — nginx·lego·syncthing(서비스), 렌더·자동화 도구
+{{- if has .chezmoi.hostname (list "owen-lolui-Macmini" "Owenui-Macmini") }}
+# 서버(맥 미니)에서만 — 2026-10-06 맥북 동기화 때 분리: 리버스 프록시·인증서·렌더 파이프라인 도구는 노트북에 필요 없다
 brew "nginx"
 brew "lego"
-brew "syncthing"
 brew "imagemagick"
 brew "potrace"
 brew "yt-dlp"
+brew "python@3.13"
+brew "librsvg"
+{{- end }}
+brew "syncthing"
 brew "coreutils"
 brew "gnu-sed"
 brew "util-linux"
 brew "rsync"
 brew "bash"
 brew "chezmoi"
-brew "python@3.13"
-brew "librsvg"
 brew "mas"
 tap "antoniorodr/memo"
 tap "lencx/chatgpt", "https://github.com/lencx/ChatGPT.git"
