@@ -262,6 +262,26 @@ class CleanupTests(unittest.TestCase):
         report["free_after"] = 25 * 1024**3
         self.assertNotIn("⚠", gc.notification(report))
 
+    def test_monthly_preview_lists_candidates_and_deletes_nothing(self):
+        # 2026-10-08 Owen 결정(Q5): 자동 삭제를 끄고 월 1회 수동 — LaunchAgent 는 미리보기만 #ops 로 보낸다
+        report = {"finished": "test", "free_before": 30 * 1024**3, "free_after": 30 * 1024**3, "dry_run": True,
+                  "candidate_bytes": 2 * 1024**3, "removed_bytes": 0, "errors": [],
+                  "groups": {"CapCut 캐시": {"removed": 0, "bytes": 0, "eligible": 7, "kept": {}},
+                             "npm 캐시": {"removed": 0, "bytes": 0, "eligible": 0, "kept": {}}}}
+        message = gc.notification(report)
+        self.assertIn("미리보기", message)
+        self.assertIn("지울 후보: 7개 · 2.00GiB", message)
+        self.assertIn("• CapCut 캐시: 7개", message)
+        self.assertNotIn("npm 캐시", message)
+        self.assertIn("disk-cleanup --apply", message)
+        self.assertNotIn("완료", message)
+
+    def test_launch_agent_runs_monthly_preview_only(self):
+        plist = (SOURCE.parents[2] / "private_Library/private_LaunchAgents/com.owen.disk-cleanup.plist.tmpl").read_text()
+        self.assertIn("<string>--dry-run</string>", plist)
+        self.assertNotIn("<string>--apply</string>", plist)
+        self.assertIn("<key>Day</key><integer>1</integer>", plist)
+
 
 if __name__ == "__main__":
     unittest.main()

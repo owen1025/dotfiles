@@ -9,7 +9,7 @@
         <string>/usr/bin/env</string>
         <string>python3</string>
         <string>{{ .chezmoi.homeDir }}/.local/bin/disk-cleanup</string>
-        <string>--apply</string>
+        <string>--dry-run</string>
         <string>--notify</string>
     </array>
     <key>EnvironmentVariables</key>
@@ -17,10 +17,13 @@
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
+    <!-- 2026-10-08 Owen 결정: 자동 삭제를 끄고 월 1회 수동. 매달 1일 10:00 에 미리보기만 #ops 로 보내고,
+         실제 삭제는 Owen 확인 뒤 `disk-cleanup --apply` 로 손으로 한다. -->
     <key>StartCalendarInterval</key>
     <dict>
-        <key>Hour</key><integer>4</integer>
-        <key>Minute</key><integer>30</integer>
+        <key>Day</key><integer>1</integer>
+        <key>Hour</key><integer>10</integer>
+        <key>Minute</key><integer>0</integer>
     </dict>
     <key>ProcessType</key><string>Background</string>
     <key>LowPriorityIO</key><true/>
