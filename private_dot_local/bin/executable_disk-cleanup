@@ -99,12 +99,19 @@ class Processes:
         return any(name in self.commands for name in names)
 
 
+CAPCUT_REBUILT_CACHES = ("frameThumbnail", "audioWave", "segmentPrerenderCache", "prerender", "image", "fontImage")
+
+
 def rules(home, temp):
     capcut = home / "Movies/CapCut/User Data"
     support = home / "Library/Application Support"
     slack = home / "Library/Containers/com.tinyspeck.slackmacgap/Data/Library/Application Support/Slack"
     result = [
-        Rule("CapCut 캐시", capcut / "Cache", 3, apps=("/Applications/CapCut.app/",)),
+        # CapCut: 스스로 다시 만드는 캐시만(썸네일·파형·미리 렌더·미리보기 이미지). Cache/effect·artistEffect·music·
+        # ressdk_db 는 프로젝트가 경로로 가리키는 리소스와 그 목록 DB라 지우면 안 된다 — 2026-10-08 git-trick 에서
+        # 비워진 마스크 패키지(effect/1068046537) 때문에 캡컷이 토킹탑 둥근 창을 경고 없이 빼고 렌더했다.
+        *[Rule("CapCut 캐시", capcut / "Cache" / sub, 3, apps=("/Applications/CapCut.app/",))
+          for sub in CAPCUT_REBUILT_CACHES],
         Rule("npm 캐시", home / ".npm/_cacache", 3),
         Rule("npx 패키지", home / ".npm/_npx", 7, "children"),
         Rule("Chrome 캐시", home / "Library/Caches/Google", 3,

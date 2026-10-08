@@ -7,7 +7,7 @@
 
 | 대상 | 보존 기간 | 보호 조건 |
 |---|---:|---|
-| CapCut·npm·Chrome·Slack·Claude 캐시, 앱 업데이트 설치 파일 | 3일 | 최신 mtime/ctime, 열린 파일, 소유 앱 프로세스(Chromium 디스크 캐시는 제외 — 아래) |
+| npm·Chrome·Slack·Claude 캐시, CapCut 재생성 캐시(썸네일·파형·미리 렌더·미리보기 이미지 — 아래 10-08), 앱 업데이트 설치 파일 | 3일 | 최신 mtime/ctime, 열린 파일, 소유 앱 프로세스(Chromium 디스크 캐시는 제외 — 아래) |
 | Chrome 앱 복제본 `X/com.google.Chrome.code_sign_clone/*` | 1일 | 실행 중 Chrome이 연 실행 파일, 프로세스 명령줄 |
 | npx 패키지, 개발 검증/배포 복제 폴더(`lazyowen-web-deploy`·`-dev-deploy`), `/private/tmp/studio-sandbox/app/.next` | 7일 | 하위 전체 최신 수정·프로세스 명령줄·열린 파일 |
 | `/private/tmp/claude-<uid>` 세션 scratchpad와 bash-edit-diff | 7일 | 세션 디렉터리 전체 유휴 기준 |
@@ -27,6 +27,19 @@
 
 프로젝트·원본 영상·Google Drive·대화 기록·Hermes data/wiki/DB·활성 Codex 런타임은
 자동 정리 대상이 아니다.
+
+### 2026-10-08 개정 — CapCut 은 재생성 캐시만
+
+`CapCut 캐시` 규칙이 `~/Movies/CapCut/User Data/Cache` 전체를 3일 기준으로 지웠다. 그 아래
+`effect/<id>/<md5>/`·`artistEffect`·`music` 은 캐시가 아니라 **프로젝트가 절대 경로로 가리키는 리소스**이고
+`ressdk_db`·`cloudDraft` 는 리소스 목록·클라우드 SQLite 다. 파일 단위로 지우니 폴더 껍데기만 남아,
+10-08 04:30 실행이 토킹탑 둥근 창 마스크 패키지(`effect/1068046537`)를 비웠고 그날 편집 자동화 export(git-trick)에서
+캡컷이 그 마스크를 경고 없이 빼고 렌더했다(아래 띠 마스크만 보임). 캡컷은 지금 목록에 있는 이펙트만 다시 받고,
+템플릿이 품은 옛 이펙트 번호는 다시 받지 않는다. 그날 이펙트 패키지 392개 중 149개가 빈 껍데기, 정리량은 하루
+0.4~1.8GB(여유 178GB).
+
+지금은 `CAPCUT_REBUILT_CACHES`(frameThumbnail·audioWave·segmentPrerenderCache·prerender·image·fontImage)만
+지운다. 비워진 패키지 복구와 캡컷 열기 전 점검은 capcut-automation `capcut_cache`(같은 md5 사본·보관소에서 채움).
 
 ### 2026-10-02 개정 — 상시 실행 앱과 Chrome 복제본
 

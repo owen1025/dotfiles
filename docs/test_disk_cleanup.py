@@ -246,6 +246,15 @@ class CleanupTests(unittest.TestCase):
         self.assertEqual(roots["Chrome 앱 복제본"],
                          self.root / "folders/xx/X/com.google.Chrome.code_sign_clone")
 
+    def test_capcut_rules_touch_only_caches_capcut_rebuilds(self):
+        # 2026-10-08 git-trick: a mask package under Cache/effect was emptied and CapCut rendered the edit without it
+        home = self.root / "home"
+        cache = home / "Movies/CapCut/User Data/Cache"
+        roots = {rule.root for rule in gc.rules(home, None) if rule.name == "CapCut 캐시"}
+        self.assertEqual(roots, {cache / sub for sub in gc.CAPCUT_REBUILT_CACHES})
+        for kept in ("effect", "artistEffect", "music", "ressdk_db", "cloudDraft"):
+            self.assertFalse(any(cache / kept == root or (cache / kept) in root.parents for root in roots), kept)
+
     def test_low_free_space_warns_before_macos_purge(self):
         report = {"finished": "test", "free_before": 0, "free_after": 13 * 1024**3,
                   "groups": {}, "removed_bytes": 0, "errors": []}
