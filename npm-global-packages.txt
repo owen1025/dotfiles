@@ -9,3 +9,5 @@ openclaw
 typescript-language-server
 typescript
 vercel
+bash-language-server
+dockerfile-language-server-nodejs

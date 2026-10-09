@@ -16,13 +16,25 @@
         "args": ["serve"],
         "filetypes": [
             "terraform",
-            "tf"
+            "terraform-vars"
         ],
         "initializationOptions": {},
         "settings": {}
-      },
-    },    
+      }
+    },
     "yaml.schemas": {
-      "kubernetes": "/*.yaml"
+      "kubernetes": [
+        "/k8s/*.yaml",
+        "/kubernetes/*.yaml",
+        "/manifests/*.yaml",
+        "*.k8s.yaml"
+      ]
+    },
+    "go.checkForUpdates": "disabled",
+    "json.schemaDownload.trustedDomains": {
+      "https://www.schemastore.org": true,
+      "https://json.schemastore.org": true,
+      "https://opencode.ai": true,
+      "https://hyperframes.heygen.com": true
     }
 }

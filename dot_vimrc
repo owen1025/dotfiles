@@ -61,6 +61,15 @@ Plug 'folke/which-key.nvim'
 " Markdown preview
 Plug 'iamcco/markdown-preview.nvim', { 'do': 'cd app && npx --yes yarn install' }
 
+" Filetype 보정 — plug#end() 보다 먼저 등록해야 한다. vim-polyglot 의 ftdetect 는
+" `au! filetypedetect` 로 nvim 기본 감지를 지우고 .env 를 sh 로 잡는다(→ bash LSP 가 붙는다).
+" 별도 augroup 의 setfiletype 은 polyglot·typescript-vim 보다 먼저 돌고 그 au! 에도 안 지워진다.
+augroup owen_ftdetect
+    autocmd!
+    autocmd BufNewFile,BufRead .env,.env.*,*.env,.flaskenv setfiletype env
+    autocmd BufNewFile,BufRead *.tsx setfiletype typescriptreact
+augroup END
+
 " Initialize plugin system
 call plug#end()
 " ####################### vim-plug stop #######################
@@ -120,6 +129,12 @@ autocmd FileType go set list lcs=tab:\┊\ "(last character is a space...)
 autocmd FileType go hi SpecialKey ctermfg=gray
 autocmd FileType python let b:coc_root_patterns = ['.git', '.env', 'venv', '.venv', 'setup.cfg', 'setup.py', 'pyproject.toml', 'pyrightconfig.json']
 au BufNewFile,BufRead Jenkinsfile setf groovy " Jenkinsfile syntax on
+" *.tfvars: vim-terraform 이 filetype=terraform 으로 강제해 terraform-ls 가 모듈 파일로 읽다 실패한다.
+" terraform 문법·fmt 는 그대로 두고 coc 가 넘기는 언어 ID 만 terraform-vars 로.
+au BufNewFile,BufRead *.tfvars setlocal filetype=terraform.tfvars
+let g:coc_filetype_map = {'terraform.tfvars': 'terraform-vars'}
+" nvim 0.12 java 문법이 Javadoc 의 Markdown 을 polyglot markdown 에 없는 그룹으로 링크한다(E28)
+let g:java_ignore_markdown = 1
 
 " For Neovim 0.1.3 and 0.1.4 - https://github.com/neovim/neovim/pull/2198
 if (has('nvim'))
@@ -387,6 +402,24 @@ let g:coc_global_extensions = [
             \'coc-tsserver',
             \'coc-marketplace'
             \]
+
+" coc-settings.json 의 languageserver 중 실행 파일이 없는 것은 끈다 — 없으면 그 filetype 을
+" 열 때마다 'spawn … ENOENT' 와 '[1]Go to output:' 프롬프트가 뜬다.
+function! s:CocDisableMissingServers() abort
+    let l:home = get(g:, 'coc_config_home', has('nvim') ? stdpath('config') : expand('~/.vim'))
+    try
+        let l:servers = get(json_decode(join(readfile(l:home . '/coc-settings.json'), "\n")), 'languageserver', {})
+    catch
+        return
+    endtry
+    let g:coc_user_config = get(g:, 'coc_user_config', {})
+    for [l:name, l:server] in items(l:servers)
+        if has_key(l:server, 'command') && !executable(l:server.command)
+            let g:coc_user_config['languageserver.' . l:name . '.enable'] = v:false
+        endif
+    endfor
+endfunction
+call s:CocDisableMissingServers()
 
 " vim-terraform setting
 let g:terraform_align=1
