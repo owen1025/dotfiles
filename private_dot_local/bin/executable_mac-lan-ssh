@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""이 Mac mini의 기존 SSH 키 인증 정책에 내부망 접속만 추가한다."""
+
+import argparse
+import datetime
+import os
+from pathlib import Path
+import platform
+import shutil
+import subprocess
+import tempfile
+
+
+CONFIG = Path("/etc/ssh/sshd_config.d/040-lazyowen-tailscale-only.conf")
+TAILNET = {"owen@100.64.0.0/10", "owen@fd7a:115c:a1e0::/48"}
+LAN = "owen@192.168.219.0/24"
+SSHD = "/usr/sbin/sshd"
+
+
+def updated_config(original):
+    lines = original.splitlines(keepends=True)
+    matches = [i for i, line in enumerate(lines)
+               if line.split() and line.split()[0].lower() == "allowusers"]
+    if len(matches) != 1:
+        raise ValueError("AllowUsers가 정확히 한 줄인 기존 설정만 수정합니다.")
+    index = matches[0]
+    users = set(lines[index].split()[1:])
+    if users not in (TAILNET, TAILNET | {LAN}):
+        raise ValueError("예상과 다른 SSH 허용 목록입니다. 기존 설정을 검토하세요.")
+    if users == TAILNET | {LAN}:
+        return original
+    lines[index] = lines[index].rstrip("\r\n") + " " + LAN + "\n"
+    lines.insert(index, "# 2026-10-19 Owen 요청: 기존 공개키 인증 유지, 내부망 192.168.219.0/24 추가.\n")
+    return "".join(lines)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true", help="관리자 권한으로 적용 (기본: 미리보기)")
+    args = parser.parse_args()
+    if platform.system() != "Darwin":
+        parser.error("macOS 전용입니다.")
+    if CONFIG.is_symlink() or not CONFIG.is_file():
+        parser.error(f"기존 일반 파일이 필요합니다: {CONFIG}")
+    original = CONFIG.read_text()
+    updated = updated_config(original)
+    if updated == original:
+        print(f"이미 허용됨: {LAN} (변경 없음)")
+        return
+    if not args.apply:
+        import difflib
+        print("".join(difflib.unified_diff(original.splitlines(True), updated.splitlines(True),
+                                         fromfile=str(CONFIG), tofile=str(CONFIG))), end="")
+        print("적용: sudo ~/.local/bin/mac-lan-ssh --apply")
+        return
+    if os.geteuid() != 0:
+        parser.error("관리자 인증이 필요합니다: sudo ~/.local/bin/mac-lan-ssh --apply")
+
+    # 검증 실패 시 원래 파일로 복원한다. 백업·임시 파일은 Include 대상 밖에 둔다.
+    subprocess.run([SSHD, "-t"], check=True)
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    backup = CONFIG.parent.parent / f"{CONFIG.name}.backup-{stamp}"
+    with tempfile.TemporaryDirectory(prefix=".lan-ssh-", dir=CONFIG.parent.parent) as tmp:
+        candidate = Path(tmp) / CONFIG.name
+        candidate.write_text(updated)
+        os.chmod(candidate, 0o644)
+        subprocess.run([SSHD, "-t", "-f", str(candidate)], check=True)
+        shutil.copy2(CONFIG, backup)
+        os.chmod(backup, 0o600)
+        os.replace(candidate, CONFIG)
+        try:
+            subprocess.run([SSHD, "-t"], check=True)
+            result = subprocess.run([SSHD, "-T"], check=True, text=True, capture_output=True)
+            effective = dict(line.split(" ", 1) for line in result.stdout.splitlines())
+            required = {"passwordauthentication": "no", "kbdinteractiveauthentication": "no",
+                        "permitrootlogin": "no", "authenticationmethods": "publickey"}
+            if any(effective.get(key) != value for key, value in required.items()):
+                raise ValueError("기존 공개키 전용 인증 정책 검증 실패")
+            allowed = [line.split(" ", 1)[1] for line in result.stdout.splitlines()
+                       if line.startswith("allowusers ")]
+            if set(" ".join(allowed).split()) != TAILNET | {LAN}:
+                raise ValueError("실제 SSH 허용 목록 검증 실패")
+        except Exception:
+            shutil.copy2(backup, candidate)
+            os.chmod(candidate, 0o644)
+            os.replace(candidate, CONFIG)
+            raise
+    print(f"적용 완료: {LAN}, 기존 Tailscale 접속·공개키 전용 인증 유지")
+    print(f"백업: {backup}")
+    print("새 SSH/mosh 연결부터 적용됩니다. 실행 중인 세션은 유지됩니다.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        raise SystemExit(f"적용 실패: {error}")
