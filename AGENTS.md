@@ -296,6 +296,7 @@ chezmoi init --apply \
 
 ## Gotchas
 
+- **Mac mini 내부망 SSH·화면 공유는 SSH와 PF를 함께 확인 (2026-10-19)** — `owen-lolui-Macmini`는 `sshd_config.d/040-lazyowen-tailscale-only.conf`의 `AllowUsers`와 PF 앵커 `com.apple/990.lazyowen` 두 겹으로 Tailscale만 허용했다. macOS 앱 방화벽이 꺼져 있어도 PF가 TCP/UDP 22·88·3283·5900을 차단한다. 자기 LAN IP에 연결하는 검사는 루프백 예외를 타서 거짓 성공하므로 **다른 LAN 기기에서 검증**한다. `mac-lan-ssh` 미리보기 후 `sudo ~/.local/bin/mac-lan-ssh --apply`로 기존 키 인증·외부 차단을 유지하면서 `192.168.219.0/24`의 SSH·화면 공유만 허용한다. SSH가 이미 허용돼도 PF 적용은 생략하지 않는다. 문서 `docs/mac-lan-access.md`, 회귀 검사 `python3 -m unittest discover -s docs -p 'test_mac_lan_ssh.py' -v`.
 - **Ghostty 경로에 공백** — `Library/Application Support/` chezmoi가 네이티브 처리하므로 따옴표 불필요
 - **`.zshrc`의 `gopen`** — alias가 아닌 함수 (셸 시작 시 git 에러 방지)
 - **`.zshrc`의 openclaw completion** — `[ -f ... ] && source`로 조건부 로드 (미설치 대응)
