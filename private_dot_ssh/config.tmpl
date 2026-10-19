@@ -6,6 +6,12 @@ Host github.com
     Port 443
     User git
 
+# 2026-10-20 Owen: 구 태국 맥미니 = m4 (M4 맥미니, 한국 사무실). 옛 이름 studio-th·oldmac 도 같은 곳으로.
+# tailnet IP 로 고정 — MagicDNS 이름이 바뀌거나 m4 의 관리 서버 연결이 끊겨도 그대로 닿는다.
+Host m4 studio-th oldmac
+    HostName 100.78.251.64
+    User owen
+
 {{ end -}}
 Host *
 {{ if eq .chezmoi.os "darwin" -}}
