@@ -8,6 +8,12 @@ set -euo pipefail
 LABEL=com.owen.chrome-automation-gc
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 [[ -f $PLIST ]] || { echo "WARN: $PLIST 가 없다 — chezmoi apply 순서 확인" >&2; exit 0; }
+# 손으로 disable 해 둔 맥(2026-10-03 M6 이관 때 얼린 m4)에선 bootstrap 이 오류 5 로 실패해 chezmoi apply 전체가 멈췄다 — 그 상태를 지키고 건너뛴다.
+# 다시 켜기 = launchctl enable gui/$(id -u)/com.owen.chrome-automation-gc 뒤 chezmoi apply.
+if launchctl print-disabled "gui/$(id -u)" | grep -Eq "\"$LABEL\" => (disabled|true)"; then
+	echo "chrome-automation-gc: 이 맥에선 꺼 둔 상태(launchctl disable)라 등록을 건너뜀"
+	exit 0
+fi
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
