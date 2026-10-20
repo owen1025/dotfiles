@@ -12,6 +12,14 @@ Host m4 studio-th oldmac
     HostName 100.78.251.64
     User owen
 
+{{ if eq .chezmoi.hostname "Owenui-Macmini" -}}
+# m4 에서 서버(M6)로 — 2026-10-03 맥 이관 때 m4 에 손으로 넣었던 블록(손으로 둔 블록은 chezmoi apply 가 지운다, 2026-10-20 템플릿으로 옮김).
+# HostKeyAlias = m4 known_hosts 에 이 이름으로 저장된 서버 키.
+Host studio-kr
+    HostName 100.74.65.14
+    HostKeyAlias studio-kr
+
+{{ end -}}
 {{ end -}}
 Host *
 {{ if eq .chezmoi.os "darwin" -}}
