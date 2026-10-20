@@ -34,6 +34,25 @@
 프로젝트·원본 영상·Google Drive·대화 기록·Hermes data/wiki/DB·활성 Codex 런타임은
 자동 정리 대상이 아니다.
 
+### 2026-10-20 — 맥북에서 옛 규칙이 계속 돌았다 · 캡컷 소재 보호를 규칙과 따로
+
+10-08 에 이 저장소의 규칙을 고쳤지만 맥북(choi의 노트북)은 그 뒤 `chezmoi update` 를 하지 않아 **옛 스크립트(캡컷 캐시 전체 3일)와
+옛 plist(매일 04:30 `--apply`)가 그대로 돌았다**. 맥북엔 Hermes CS 의 `slack_post.py` 가 없어 등록 스크립트가 새 등록을 건너뛰었고,
+그 전에 등록된 옛 에이전트는 내리지 않았다 — 정리 알림도 같은 이유로 매번 실패해 아무도 몰랐다. 10-18·20 아침 실행이 효과 패키지
+110개·artistEffect 10개를 비웠고, Owen 이 맥북에서 손 수정한 편(tripo3d·buzzy·claude-resume)의 '미니 줌'·피부 보정 효과가 빈 폴더가
+됐다. 같은 날 한 것:
+
+- 맥북 에이전트를 내리고 끔(`launchctl bootout` + `disable` — m4 와 같은 상태). 되돌리기 `launchctl enable gui/$(id -u)/com.owen.disk-cleanup`.
+- 스크립트: 어떤 규칙이 넓어져도 `CapCut/User Data/Projects` 와 `Cache/{effect,artistEffect,music,ressdk_db,cloudDraft}` 는
+  `inspect` 가 보존 사유 '캡컷 프로젝트·리소스 보존'으로 남긴다(`capcut_resource`, 규칙 목록과 따로 — 테스트가 캐시 전체 규칙·캡컷
+  폴더 통째 규칙으로 확인).
+- 등록 스크립트: Slack 이 없어 새 등록을 건너뛰는 맥에서도 이미 등록된 에이전트를 내리고 끈다.
+- 비워진 패키지 복구와 매일 점검은 Hermes studio `scripts/capcut_effect_guard.py`(세 맥의 패키지를 서버 보관소에 모으고 빈 것을 채움,
+  새로 비면 #ops).
+
+**교훈**: 이 저장소를 고쳤다고 세 맥이 다 바뀐 것이 아니다. 정리 규칙을 바꾸면 각 맥에서 `launchctl print gui/$(id -u)/com.owen.disk-cleanup`
+의 인자와 `~/.local/bin/disk-cleanup` 의 규칙을 확인한다.
+
 ### 2026-10-08 개정 — CapCut 은 재생성 캐시만
 
 `CapCut 캐시` 규칙이 `~/Movies/CapCut/User Data/Cache` 전체를 3일 기준으로 지웠다. 그 아래

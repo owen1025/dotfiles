@@ -10,7 +10,11 @@ LABEL=com.owen.disk-cleanup
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 PROFILE="$HOME/.hermes/profiles/cs"
 if [[ ! -f "$PROFILE/.env" || ! -f "$PROFILE/scripts/slack_post.py" ]]; then
-    echo "disk-cleanup: Hermes CS Slack 설정이 없어 자동 등록을 건너뜀"
+    # 2026-10-20: 맥북은 이 분기로 새 등록을 건너뛰어, 그 전에 등록된 옛 에이전트(매일 --apply · 캡컷 캐시 전체)가 계속 돌며
+    # 효과 패키지 120개를 비웠다. 알림을 못 보내는 맥에선 미리보기도 쓸모가 없으니 이미 등록된 것도 내린다.
+    /bin/launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+    /bin/launchctl disable "gui/$(id -u)/$LABEL" 2>/dev/null || true
+    echo "disk-cleanup: Hermes CS Slack 설정이 없어 자동 등록을 건너뜀(이미 등록된 것은 내림)"
     exit 0
 fi
 [[ -x "$HOME/.local/bin/disk-cleanup" && -f "$PLIST" ]]

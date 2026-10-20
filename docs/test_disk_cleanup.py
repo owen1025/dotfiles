@@ -255,6 +255,21 @@ class CleanupTests(unittest.TestCase):
         for kept in ("effect", "artistEffect", "music", "ressdk_db", "cloudDraft"):
             self.assertFalse(any(cache / kept == root or (cache / kept) in root.parents for root in roots), kept)
 
+    def test_capcut_resources_survive_a_rule_over_the_whole_cache(self):
+        # 2026-10-20: the MacBook still ran the pre-10-08 rule (all of Cache, 3 days) and emptied 120 effect packages
+        cache = Path("home/Movies/CapCut/User Data/Cache")
+        package = self.file(str(cache / "effect/1068046537/02b8999168d121538a98ea59127483ef/config.json"))
+        music = self.file(str(cache / "music/2d3f1b04a7728c8fdd1933dc15ea9199.mp3"))
+        thumb = self.file(str(cache / "frameThumbnail/a.jpg"))
+        project = self.file("home/Movies/CapCut/User Data/Projects/com.lveditor.draft/x/draft_info.json")
+        report, _ = self.run_rule(gc.Rule("CapCut 캐시", self.root / cache, 3))
+        self.assertTrue(package.exists() and music.exists())
+        self.assertFalse(thumb.exists())
+        self.assertEqual(report["groups"]["CapCut 캐시"]["kept"]["캡컷 프로젝트·리소스 보존"], 2)
+        whole, _ = self.run_rule(gc.Rule("캡컷 통째", self.root / "home/Movies/CapCut", 3, "whole"))
+        self.assertTrue(project.exists() and package.exists())
+        self.assertEqual(whole["groups"]["캡컷 통째"]["removed"], 0)
+
     def test_low_free_space_warns_before_macos_purge(self):
         report = {"finished": "test", "free_before": 0, "free_after": 13 * 1024**3,
                   "groups": {}, "removed_bytes": 0, "errors": []}

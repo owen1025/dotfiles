@@ -100,6 +100,20 @@ class Processes:
 
 
 CAPCUT_REBUILT_CACHES = ("frameThumbnail", "audioWave", "segmentPrerenderCache", "prerender", "image", "fontImage")
+# 어떤 규칙이 넓어져도(옛 "CapCut 캐시" = Cache 전체) 캡컷 프로젝트와, 프로젝트가 경로로 가리키는 리소스·그 목록 DB 는
+# 지우지 않는다. 2026-10-20: 맥북은 10-08 규칙 변경을 받지 않아 옛 규칙이 매일 아침 --apply 로 돌며 10-18·20 에 효과 패키지
+# 120개를 비웠다 — Owen 이 맥북에서 넣은 피부 보정 효과가 서버 수정본 영상에서 빠진 사고의 한 갈래.
+CAPCUT_KEPT = ("effect", "artistEffect", "music", "ressdk_db", "cloudDraft")
+
+
+def capcut_resource(path):
+    """캡컷 `User Data/Projects` 와 `User Data/Cache/<CAPCUT_KEPT>` 아래인가. 그것을 품은 폴더는 inspect 가 하위를 돌며 잡는다."""
+    parts = Path(path).parts
+    for i in range(len(parts) - 1):
+        if parts[i:i + 2] == ("CapCut", "User Data"):
+            rest = parts[i + 2:]
+            return bool(rest) and (rest[0] == "Projects" or (rest[0] == "Cache" and len(rest) > 1 and rest[1] in CAPCUT_KEPT))
+    return False
 
 
 def rules(home, temp):
@@ -214,6 +228,8 @@ def inspect(path, processes):
     stack = [path]
     while stack:
         item = stack.pop()
+        if capcut_resource(item):
+            raise ValueError("캡컷 프로젝트·리소스 보존")
         s = item.lstat()
         if stat.S_ISLNK(s.st_mode):
             # 내부 링크는 삭제될 때 링크만 제거되고 대상은 추적하지 않는다.
