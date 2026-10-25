@@ -15,7 +15,9 @@ from pathlib import Path
 import pwd
 import re
 import shutil
+import shlex
 import subprocess
+import sys
 import tempfile
 import tomllib
 
@@ -84,17 +86,72 @@ def toml_text(data):
     return text
 
 
+def login_accounts(email, report_path=None):
+    """공식 CLI를 실제 하니 로그인 셸에서 실행한다. 실패는 설치와 분리해 기록한다."""
+    report = json.loads(report_path.read_text()) if report_path and report_path.exists() else {}
+    outcomes = {}
+    for label, command in (
+        ('claude2', 'CLAUDE_CONFIG_DIR="$HOME/.claude-b" command claude auth login --claudeai --email ' + shlex.quote(email)),
+        ('codex', 'command codex login --device-auth'),
+    ):
+        print(f'\n하니 {label} 공식 로그인 — {email if label == "claude2" else "사용할 ChatGPT 계정을 선택하세요"}', flush=True)
+        env = {**os.environ, 'CLAUDE_USAGE_STARTUP': '0', 'SYS_USAGE_STARTUP': '0',
+               'TERM': os.environ.get('TERM', 'xterm-256color')}
+        process = subprocess.Popen(['/usr/bin/sudo', '-H', '-u', 'hani', '/bin/zsh', '-lc', command],
+                                   env=env, cwd=TARGET, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = []
+        while char := process.stdout.read(1):
+            sys.stdout.buffer.write(char)
+            sys.stdout.buffer.flush()
+            output.append(char)
+        code = process.wait()
+        # 로그인 URL·인증 코드·토큰은 결과 파일에 남기지 않는다.
+        text = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', b''.join(output).decode(errors='replace'))
+        errors = [line for line in text.splitlines()
+                  if re.search(r'error|failed|unknown option|permission denied|오류|실패', line, re.I)]
+        errors = [re.sub(r'https?://\S+|[A-Za-z0-9_+#=/.-]{24,}', '[비공개 값 생략]', line)[:500]
+                  for line in errors[-5:]]
+        outcomes[label] = {'exit_code': code, 'errors': errors}
+        if code:
+            print(f'\n{label} 로그인 미완료(종료 코드 {code}). 설치된 설정은 유지됩니다.', flush=True)
+        report['login_results'] = outcomes
+        report['logins_completed'] = len(outcomes) == 2 and all(v['exit_code'] == 0 for v in outcomes.values())
+        if report_path:
+            fd, tmp = tempfile.mkstemp(prefix='.agent-login-report-', dir=report_path.parent)
+            with os.fdopen(fd, 'w') as f:
+                json.dump(report, f, ensure_ascii=False, indent=2)
+            os.chown(tmp, int(os.environ.get('SUDO_UID', '0')), int(os.environ.get('SUDO_GID', '0')))
+            os.replace(tmp, report_path)
+    result = subprocess.run(['/usr/bin/sudo', '-H', '-u', 'hani', '/bin/zsh', '-lc',
+                             'export CLAUDE_USAGE_ACCOUNTS="claude:$HOME/.claude,claude2:$HOME/.claude-b"; '
+                             'export CLAUDE_USAGE_CHATGPT="chatgpt:$HOME/.codex"; '
+                             'command claude-usage -r --style compact'],
+                            env={**os.environ, 'CLAUDE_USAGE_STARTUP': '0', 'SYS_USAGE_STARTUP': '0'},
+                            cwd=TARGET, capture_output=True, text=True, timeout=30)
+    print(result.stdout)
+    if report_path:
+        # 앞에서 만든 관리자 소유 일반 파일만 갱신한다.
+        report['usage_panel'] = result.stdout
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2))
+    return all(v['exit_code'] == 0 for v in outcomes.values())
+
+
 def main():
     global SOURCE, TARGET
     SOURCE, TARGET = SOURCE.resolve(), TARGET.resolve()
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--apply', action='store_true')
     ap.add_argument('--login', action='store_true')
+    ap.add_argument('--login-only', action='store_true', help='설치를 반복하지 않고 하니 로그인만 재시도')
     ap.add_argument('--email', help='새 Claude 계정 이메일(--login 사용 시 필수)')
     ap.add_argument('--report', type=Path, help='관리자가 읽을 검증 결과 파일(토큰 값 제외)')
     args = ap.parse_args()
-    if args.login and not args.email:
+    if (args.login or args.login_only) and not args.email:
         ap.error('--login에는 --email이 필요합니다.')
+    if args.login_only:
+        if os.geteuid() != 0:
+            raise SystemExit('하니 사용자로 로그인하려면 sudo로 실행해야 합니다.')
+        raise SystemExit(0 if login_accounts(args.email, args.report) else 1)
     if not args.apply:
         print('하니: claude/claude2/Codex 3행, Claude 일반 설정·플러그인, Codex CLI·설정·플러그인 설치')
         print('인증·대화·메모리·기존 권한·스튜디오 안내·개인 알림 설정은 복사하거나 덮어쓰지 않음')
@@ -301,21 +358,7 @@ fi
     export_report()
     print(json.dumps(report, ensure_ascii=False, indent=2))
     if args.login:
-        print(f'\n하니 claude2: {args.email}으로 공식 로그인합니다.', flush=True)
-        login_env = {**env, 'CLAUDE_CONFIG_DIR': str(secondary)}
-        subprocess.run([str(TARGET / '.local/bin/claude'), 'auth', 'login', '--claudeai',
-                        '--email', args.email], env=login_env, cwd=TARGET,
-                       user=account.pw_uid, group=account.pw_gid,
-                       extra_groups=os.getgrouplist('hani', account.pw_gid), check=True)
-        print('\n하니 Codex: 사용할 ChatGPT 계정으로 공식 로그인합니다.', flush=True)
-        run([str(codex_bin), 'login', '--device-auth'], check=True)
-        usage = run([str(TARGET / '.local/bin/claude-usage'), '-r'], check=True,
-                    capture_output=True, text=True)
-        print(usage.stdout)
-        report['usage_panel'] = usage.stdout
-        report['logins_completed'] = True
-        write_json('.local/state/agent-settings-sync/report.json', report)
-        export_report()
+        raise SystemExit(0 if login_accounts(args.email, args.report) else 1)
 
 
 if __name__ == '__main__':
