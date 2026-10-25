@@ -3,11 +3,11 @@
 #
 # 기본값은 30일이라 30일 지난 세션 jsonl 이 자동으로 지워진다. 09-07 편집 자동화 PRD 인터뷰 세션 원본이 이렇게 사라졌고,
 # 재검토가 근거로 쓴 09-23~10-01 세션도 10-23 부터 지워질 참이었다.
-# 보조 계정(-b, -c)의 settings.json 은 ~/.claude 로 가는 심링크라 realpath 원본에 한 번만 쓴다. 다른 키는 건드리지 않는다.
+# 보조 계정(-b, -c, -d)의 settings.json 은 ~/.claude 로 가는 심링크라 realpath 원본에 한 번만 쓴다. 다른 키는 건드리지 않는다.
 # 값을 바꾸면 이 파일 내용이 바뀌므로 chezmoi apply 때 다시 돈다.
 set -euo pipefail
 
-read -r -a CONFIG_DIRS <<<"${CLAUDE_CONFIG_DIRS:-$HOME/.claude $HOME/.claude-b $HOME/.claude-c}"
+read -r -a CONFIG_DIRS <<<"${CLAUDE_CONFIG_DIRS:-$HOME/.claude $HOME/.claude-b $HOME/.claude-c $HOME/.claude-d}"
 
 if ! command -v python3 >/dev/null 2>&1; then
 	echo "WARN: python3 가 없어 Claude 대화 기록 보존 설정을 건너뛴다" >&2

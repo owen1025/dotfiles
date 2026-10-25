@@ -29,6 +29,24 @@ ACCOUNT = {
 }
 
 
+class AccountDiscoveryTests(unittest.TestCase):
+    def test_separate_homes_show_five_and_three_accounts(self):
+        """Owen의 claude4를 추가해도 하니 패널에는 하니 계정 세 개만 보인다."""
+        with tempfile.TemporaryDirectory() as temp:
+            for user, suffixes, expected in (
+                ("owen", ("b", "c", "d"), ["claude", "claude2", "claude3", "claude4", "chatgpt"]),
+                ("hani", ("b",), ["claude", "claude2", "chatgpt"]),
+            ):
+                home = Path(temp) / user
+                for name in [".claude", ".codex", *(f".claude-{s}" for s in suffixes)]:
+                    (home / name).mkdir(parents=True)
+                (home / ".codex/auth.json").write_text('{"tokens":{"access_token":"fake-for-discovery"}}')
+                with self.subTest(user=user), patch.dict(os.environ, {}, clear=True), patch.dict(LIVE, HOME=str(home)):
+                    accounts = usage["discover_accounts"]() + usage["discover_chatgpt_accounts"]()
+                    self.assertEqual([label for label, _ in accounts], expected)
+                    self.assertTrue(all(Path(path).parent == home for _, path in accounts))
+
+
 class UsageDisplayTests(unittest.TestCase):
     def render(self, account, style):
         return usage["render"]({"fetched_at": 1788962076, "accounts": [account]},

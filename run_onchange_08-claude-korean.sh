@@ -1,19 +1,19 @@
 #!/bin/bash
-# Claude Code 가 어느 디렉터리·어느 계정(claude/claude2/claude3)에서 떠도 한국어로 답하게 한다.
+# Claude Code 가 어느 디렉터리·어느 계정(claude ~ claude4)에서 떠도 한국어로 답하게 한다.
 # (2026-09-27: Fable 은 괜찮은데 Opus 5.5 가 가끔 영어로 답하는 문제)
 #
 # 두 겹으로 건다:
 #   1) settings.json "language": "korean" — CLI 공식 설정(/config 의 Language). 시스템 프롬프트에 들어간다.
 #      보조 계정의 settings.json 은 ~/.claude 로 가는 심링크라 실제 기록은 한 번뿐이다.
 #   2) 유저 메모리 <configdir>/CLAUDE.md 의 관리 블록 — 모든 프로젝트에서 읽히는 전역 지시.
-#      ~/.claude/CLAUDE.md 가 원본, -b/-c 는 심링크(dot_claude-accounts.zsh 의 _claude_alt 도 매 호출 확인).
+#      ~/.claude/CLAUDE.md 가 원본, -b/-c/-d 는 심링크(dot_claude-accounts.zsh 의 _claude_alt 도 매 호출 확인).
 #      블록 밖에 손으로 적은 내용은 건드리지 않는다.
 #
-#   대상 계정 : CLAUDE_CONFIG_DIRS="$HOME/.claude $HOME/.claude-b" (기본값 = claude, claude2, claude3)
+#   대상 계정 : CLAUDE_CONFIG_DIRS="$HOME/.claude $HOME/.claude-b" (기본값 = claude ~ claude4, 존재하는 계정만)
 #   문구를 바꾸면 이 파일 내용이 바뀌므로 chezmoi apply 때 다시 돈다.
 set -euo pipefail
 
-read -r -a CONFIG_DIRS <<<"${CLAUDE_CONFIG_DIRS:-$HOME/.claude $HOME/.claude-b $HOME/.claude-c}"
+read -r -a CONFIG_DIRS <<<"${CLAUDE_CONFIG_DIRS:-$HOME/.claude $HOME/.claude-b $HOME/.claude-c $HOME/.claude-d}"
 
 if ! command -v python3 >/dev/null 2>&1; then
 	echo "WARN: python3 가 없어 Claude 한국어 설정을 건너뛴다" >&2

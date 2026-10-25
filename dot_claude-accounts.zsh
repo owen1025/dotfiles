@@ -1,9 +1,9 @@
 # Claude Code 다중 계정 — CLAUDE_CONFIG_DIR 로 크레덴셜만 격리한다.
 #   계정 A = ~/.claude    → `claude`   (myartame)
 #   계정 B = ~/.claude-b  → `claude2`  (owenchoi1025)
-#   계정 C = ~/.claude-c  → `claude3`  (2026-09-11 결제 — 디렉터리·공유 심링크는 만들어 뒀다.
-#                                      최초 1회 `claude3` 실행 = 브라우저 로그인)
-#   새 계정 추가 = 아래 `claude4() { _claude_alt "$HOME/.claude-d" "$@" }` 한 줄.
+#   계정 C = ~/.claude-c  → `claude3`
+#   계정 D = ~/.claude-d  → `claude4`  (2026-10-25 추가)
+#   계정 디렉터리는 해당 함수를 처음 실행할 때만 만든다. 하니는 claude/claude2만 사용한다.
 #
 # 공유(심링크): projects(세션 트랜스크립트 + 자동 메모리) · file-history · skills · plugins · settings.json · CLAUDE.md
 # 격리(계정별): 크레덴셜 · <configdir>/.claude.json · history.jsonl
@@ -11,7 +11,7 @@
 #    셸 시작 패널(claude-usage)도 같은 곳을 읽으므로 파일이 없어도 "미로그인" 으로 뜨지 않는다.)
 #
 # 한쪽이 리밋에 걸리면 세션 id 로 이어받는다:
-#   claude --resume <id>   ↔   claude2 --resume <id>   ↔   claude3 --resume <id>
+#   claude --resume <id>   ↔   claude2 --resume <id>   ↔   claude3 --resume <id>   ↔   claude4 --resume <id>
 # ⚠️ --continue / -c 는 계정별 .claude.json 의 lastSessionId 를 보므로 교차로 안 먹는다. 반드시 id 로 resume.
 #
 # 세션은 $CLAUDE_CONFIG_DIR/projects/<cwd-슬러그>/<id>.jsonl 에 저장된다. 이 링크가 끊기면
@@ -183,6 +183,7 @@ _claude_alt() {
 
 claude2() { _claude_alt "$HOME/.claude-b" "$@" }
 claude3() { _claude_alt "$HOME/.claude-c" "$@" }
+claude4() { _claude_alt "$HOME/.claude-d" "$@" }
 
 # ── 사용량 대시보드 ──────────────────────────────────────────────────────────
 #   claude-usage          캐시 기준으로 즉시 출력 (계정은 ~/.claude-* 자동 발견: -b→claude2, -c→claude3.
