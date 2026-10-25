@@ -50,3 +50,18 @@ Claude는 활성 플러그인·설치 레지스트리·마켓플레이스·스�
 Codex는 `config.toml`의 플러그인·마켓플레이스·스킬·MCP·훅을 함께 확인한다.
 다른 사용자의 홈을 가리키는 절대 경로는 해당 사용자의 홈으로 바꾼다.
 플러그인 설치 상태가 같아도 외부 서비스 로그인과 macOS 앱 권한은 사용자별이다.
+
+하니의 기존 일반 설정·플러그인이 비어 있으면 관리자가 다음 도구로 설치한다:
+
+```sh
+python3 docs/setup_hani_agents.py  # 변경 계획만 출력
+sudo python3 docs/setup_hani_agents.py --apply --login --email '<새 Claude 이메일>'
+```
+
+기존 파일은 `.bak.agent-setup-<시각>`으로 백업한다. Claude의 모델·추론·언어·
+플러그인·상태 표시줄, Codex의 모델·추론·플러그인·스킬·MCP를 맞춘다.
+하니의 기존 permissions·sandbox·hooks, 홈 AGENTS.md, 인증·대화·학습 메모리는 유지한다.
+Owen의 Slack·Orca 알림 계정과 개인 권한 설정은 복제하지 않는다.
+각 CLI 로그인은 하니 사용자로 따로 수행한다. Codex는 사용할 ChatGPT 계정을 직접 선택한다.
+검증 결과는 `~hani/.local/state/agent-settings-sync/report.json`,
+선택한 `--report <경로>`에도 기록한다. 토큰 값은 기록하지 않는다.
