@@ -16,13 +16,13 @@ ChatGPT 계정(2026-09-08)은 Codex CLI 가 로그인해 둔 `$CODEX_HOME/auth.j
                         와 함께 보여 준다(STALE_MAX 까지). 예전엔 이걸 "토큰 만료" 로 그려 재로그인하게 만들었다.
   로그인 만료           CLI 가 refresh 거절(invalid_grant)을 겪어 refreshToken 을 "" 로 비웠거나, refresh 토큰
   (login_expired)       자체가 만료됐거나, 만료 전 토큰을 서버가 401/403 으로 거절 — 재로그인만 답이다.
-  키체인 잠김           SSH 세션 등에서 키체인을 못 엶 — 계정이 아니라 셸의 사정이라 캐시에 박지 않는다.
+  키체인 잠김           SSH 세션 등에서 키체인을 못 열고 파일 로그인도 없음 — 계정이 아니라 셸의 사정이라 캐시에 박지 않는다.
 상태 전이는 `events.log`(캐시 디렉터리)에 한 줄씩 남는다(토큰 값 없음).
 
 크레덴셜은 Claude Code 가 읽는 순서 그대로 읽는다:
   macOS  → 키체인 `Claude Code-credentials` (기본 계정)
            `Claude Code-credentials-<sha256(CLAUDE_CONFIG_DIR)[:8]>` (보조 계정)
-           키체인에 항목이 없을 때만 <configdir>/.credentials.json (CLI 의 폴백과 같다)
+           키체인에 항목이 없거나 키체인이 잠겼을 때(SSH 셸) <configdir>/.credentials.json — CLI 의 평문 폴백과 같다
   그 외  → <configdir>/.credentials.json
 
 셸 시작을 절대 막지 않는 3단 캐시:
@@ -347,15 +347,20 @@ def _creds(config_dir: str) -> tuple[dict | None, str]:
     없을 때만 보는 폴백이다. 예전엔 둘 중 늦게 만료되는 쪽을 골랐는데, 그 파일을 쓰는 건 CLI 가 아니라
     hermes 였다(2026-09-26 기본 계정 토큰을 몰래 회전시켜 파일에만 기록). CLI 는 그 토큰을 못 보고
     키체인의 소비된 refresh 토큰으로 갱신하다 "Login expired" 가 됐는데, 패널만 파일 토큰으로 정상을
-    그리고 있었다. 키체인을 못 열면(잠김·SSH 세션) 파일로 넘어가지 않는다 — 그건 CLI 의 토큰이 아니다.
+    그리고 있었다. 그래서 키체인을 읽을 수 있으면 키체인이 이긴다.
+
+    키체인이 잠긴 셸(SSH 세션 — security 가 36 을 준다)에선 파일을 본다(2026-11-01): Claude Code 2.1.x 는
+    `keychain-with-plaintext-fallback` 이라 그 셸의 CLI 도 키체인 읽기를 '없음'으로 치고 이 파일로 로그인한다
+    (잠긴 동안 쓰는 것도 이 파일). 09-26 의 hermes 포크는 S12(macOS 에서 Claude Code 크레덴셜 읽기 전용)로 막혔다.
+    키체인은 열지 않고, 파일도 읽기만 한다. 파일까지 없으면 잠김으로 둔다.
     """
     keychain, unavailable = _keychain_lookup(config_dir)
     if keychain:
         return max(keychain, key=lambda o: o.get("expiresAt") or 0), "keychain"
-    if unavailable:
-        return None, "locked"
     files = _oauth_from_file(config_dir)
-    return (files[0], "file") if files else (None, "none")
+    if files:
+        return files[0], "file"
+    return (None, "locked") if unavailable else (None, "none")
 
 
 def has_creds(config_dir: str) -> bool:
@@ -638,7 +643,7 @@ STATE_MSG = {
     "idle": ("⏸", "유휴 — 토큰만 만료, 다음 `{cmd}` 실행 때 자동 갱신 (재로그인 불필요)"),
     "login_expired": ("✗", "로그인 만료 ({err}) — {relogin}"),
     "token_expired": ("⚠", "토큰 만료 — `{cmd}` 를 한 번 실행하면 갱신됨"),     # 2026-09-27 이전 캐시
-    "keychain_locked": ("⚠", "SSH 셸이라 macOS 가 로그인 키체인을 잠가 둠 — 계정 문제 아님, 맥 화면 앞 셸에선 정상"),
+    "keychain_locked": ("⚠", "SSH 셸 키체인 잠김 · 파일 로그인 없음 (계정 이상 없음)"),
     "error": ("⚠", "조회 실패 ({err})"),
     "offline": ("⚠", "네트워크 없음 ({err}) — 연결되면 자동 재시도"),
 }
@@ -668,7 +673,7 @@ def stale_note(acct: dict) -> str | None:
     when = datetime.fromtimestamp(acct.get("as_of") or 0).astimezone().strftime("%m/%d %H:%M")
     if reason == "idle":
         return f"⏸ 유휴 · {when} 조회값 — 토큰만 만료, 다음 `{acct.get('login_cmd') or acct['label']}` 실행 때 자동 갱신"
-    return f"⚠ 키체인을 못 엶 · {when} 조회값"
+    return f"⚠ SSH 셸 키체인 잠김 · {when} 조회값"
 
 
 def needs_attention(state: dict | None) -> bool:
@@ -695,7 +700,7 @@ def render(state: dict, style: str, ink: Ink, width: int) -> str:
         # 숫자는 마지막 성공값이다 — 왜 갱신이 멈췄는지 스타일 공통으로 한 줄 밝힌다.
         text = f" {ink.red('⚠')} {ink.dim('네트워크 없음 · 아래는 마지막 조회값')}\n" + text
     elif state.get("keychain_locked"):
-        text = f" {ink.yellow('⚠')} {ink.dim('SSH 셸이라 키체인이 잠겨 있음(계정 문제 아님) · 아래는 마지막 조회값')}\n" + text
+        text = f" {ink.yellow('⚠')} {ink.dim('SSH 셸 키체인 잠김 · 아래는 마지막 조회값')}\n" + text
     return text
 
 

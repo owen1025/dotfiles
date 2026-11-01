@@ -244,7 +244,7 @@ class TokenStateTests(unittest.TestCase):
         self.assertEqual(rec["state"], "keychain_locked")
 
     def test_keychain_wins_over_a_later_expiring_file(self):
-        """hermes 가 회전시켜 파일에만 쓴 포크(09-26)를 CLI 는 안 본다 — 패널도 안 본다."""
+        """키체인을 읽을 수 있으면 키체인이 이긴다(09-26 hermes 포크). 잠긴 셸(SSH)에선 CLI 처럼 파일(2026-11-01)."""
         keychain = {"accessToken": "cli", "expiresAt": 1}
         fork = {"accessToken": "hermes-fork", "expiresAt": 9_999_999_999_999}
         with patch.dict(LIVE, {"_keychain_lookup": lambda _d: ([keychain], False),
@@ -252,6 +252,9 @@ class TokenStateTests(unittest.TestCase):
             self.assertEqual(usage["_creds"]("/unused"), (keychain, "keychain"))
         with patch.dict(LIVE, {"_keychain_lookup": lambda _d: ([], True),
                                 "_oauth_from_file": lambda _d: [fork]}):
+            self.assertEqual(usage["_creds"]("/unused"), (fork, "file"))   # SSH 셸의 CLI 가 쓰는 평문 폴백
+        with patch.dict(LIVE, {"_keychain_lookup": lambda _d: ([], True),
+                                "_oauth_from_file": lambda _d: []}):
             self.assertEqual(usage["_creds"]("/unused"), (None, "locked"))
         with patch.dict(LIVE, {"_keychain_lookup": lambda _d: ([], False),
                                 "_oauth_from_file": lambda _d: [fork]}):
@@ -310,7 +313,7 @@ class IdleCarryTests(unittest.TestCase):
         locked = {"label": "claude3", "dir": "/unused/claude-c", "state": "keychain_locked"}
         state, cacheable = usage["merge_offline"]([locked], self.prev(60))
         self.assertFalse(cacheable)
-        self.assertIn("키체인이 잠겨 있음(계정 문제 아님)", usage["render"](state, "bars", usage["Ink"](False), 120))
+        self.assertIn("SSH 셸 키체인 잠김", usage["render"](state, "bars", usage["Ink"](False), 120))
 
     def test_attention_follows_account_states(self):
         self.assertFalse(usage["needs_attention"](self.prev(60)))
