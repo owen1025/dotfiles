@@ -310,7 +310,7 @@ class IdleCarryTests(unittest.TestCase):
         locked = {"label": "claude3", "dir": "/unused/claude-c", "state": "keychain_locked"}
         state, cacheable = usage["merge_offline"]([locked], self.prev(60))
         self.assertFalse(cacheable)
-        self.assertIn("키체인을 못 엶", usage["render"](state, "bars", usage["Ink"](False), 120))
+        self.assertIn("키체인이 잠겨 있음(계정 문제 아님)", usage["render"](state, "bars", usage["Ink"](False), 120))
 
     def test_attention_follows_account_states(self):
         self.assertFalse(usage["needs_attention"](self.prev(60)))

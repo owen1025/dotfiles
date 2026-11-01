@@ -638,7 +638,7 @@ STATE_MSG = {
     "idle": ("⏸", "유휴 — 토큰만 만료, 다음 `{cmd}` 실행 때 자동 갱신 (재로그인 불필요)"),
     "login_expired": ("✗", "로그인 만료 ({err}) — {relogin}"),
     "token_expired": ("⚠", "토큰 만료 — `{cmd}` 를 한 번 실행하면 갱신됨"),     # 2026-09-27 이전 캐시
-    "keychain_locked": ("⚠", "키체인을 못 엶 (잠김·SSH 세션) — 이 셸에선 조회 불가"),
+    "keychain_locked": ("⚠", "SSH 셸이라 macOS 가 로그인 키체인을 잠가 둠 — 계정 문제 아님, 맥 화면 앞 셸에선 정상"),
     "error": ("⚠", "조회 실패 ({err})"),
     "offline": ("⚠", "네트워크 없음 ({err}) — 연결되면 자동 재시도"),
 }
@@ -695,7 +695,7 @@ def render(state: dict, style: str, ink: Ink, width: int) -> str:
         # 숫자는 마지막 성공값이다 — 왜 갱신이 멈췄는지 스타일 공통으로 한 줄 밝힌다.
         text = f" {ink.red('⚠')} {ink.dim('네트워크 없음 · 아래는 마지막 조회값')}\n" + text
     elif state.get("keychain_locked"):
-        text = f" {ink.yellow('⚠')} {ink.dim('키체인을 못 엶 (잠김·SSH 세션) · 아래는 마지막 조회값')}\n" + text
+        text = f" {ink.yellow('⚠')} {ink.dim('SSH 셸이라 키체인이 잠겨 있음(계정 문제 아님) · 아래는 마지막 조회값')}\n" + text
     return text
 
 
