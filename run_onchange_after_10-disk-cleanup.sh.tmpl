@@ -22,5 +22,9 @@ fi
 /bin/launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 /bin/launchctl enable "gui/$(id -u)/$LABEL"
 /bin/launchctl bootstrap "gui/$(id -u)" "$PLIST"
+{{ if eq .chezmoi.hostname "owen-lolui-Macmini" -}}
+echo "disk-cleanup: 서버 — 일요일 04:30 다시 만들어지는 캐시만 자동 삭제(--apply) launchd 등록, 결과는 Slack #ops"
+{{- else -}}
 echo "disk-cleanup: 매달 1일 10:00(현지 시각) 미리보기만 launchd 등록(삭제는 수동 --apply), 결과는 Slack #ops"
+{{- end }}
 {{ end -}}

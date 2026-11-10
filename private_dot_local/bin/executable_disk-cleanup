@@ -127,7 +127,8 @@ def rules(home, temp):
         *[Rule("CapCut 캐시", capcut / "Cache" / sub, 3, apps=("/Applications/CapCut.app/",))
           for sub in CAPCUT_REBUILT_CACHES],
         Rule("npm 캐시", home / ".npm/_cacache", 3),
-        Rule("npx 패키지", home / ".npm/_npx", 7, "children"),
+        # npx 패키지(~/.npm/_npx)는 지우지 않는다(2026-11-10): 편집 자동화(capcut-automation motion_events)가 렌더러
+        # hyperframes 를 이 캐시에서 찾고, 없으면 그 단계가 실패한다. 읽기만 하는 패키지라 mtime 이 오래돼도 쓰는 중이다.
         Rule("Chrome 캐시", home / "Library/Caches/Google", 3,
              apps=("/Applications/Google Chrome.app/", "chrome-headless-shell"), live=True),
         Rule("Slack 캐시", slack / "Cache", 3, apps=("/Slack.app/",), live=True),

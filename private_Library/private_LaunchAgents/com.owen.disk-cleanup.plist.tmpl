@@ -9,7 +9,11 @@
         <string>/usr/bin/env</string>
         <string>python3</string>
         <string>{{ .chezmoi.homeDir }}/.local/bin/disk-cleanup</string>
+{{- if eq .chezmoi.hostname "owen-lolui-Macmini" }}
+        <string>--apply</string>
+{{- else }}
         <string>--dry-run</string>
+{{- end }}
         <string>--notify</string>
     </array>
     <key>EnvironmentVariables</key>
@@ -17,14 +21,25 @@
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
+{{- if eq .chezmoi.hostname "owen-lolui-Macmini" }}
+    <!-- 2026-11-10 Owen 결정(디스크 전수조사 3-D): 서버(M6)는 다시 만들어지는 캐시만 주 1회 자동 삭제 — 일요일 04:30.
+         10-08 사고 원인(캡컷 효과 패키지)은 규칙에서 빠졌고, npx 패키지(편집 자동화 렌더러)도 11-10 에 뺐다. 휴지통은 손으로. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key><integer>0</integer>
+        <key>Hour</key><integer>4</integer>
+        <key>Minute</key><integer>30</integer>
+    </dict>
+{{- else }}
     <!-- 2026-10-08 Owen 결정: 자동 삭제를 끄고 월 1회 수동. 매달 1일 10:00 에 미리보기만 #ops 로 보내고,
-         실제 삭제는 Owen 확인 뒤 `disk-cleanup --apply` 로 손으로 한다. -->
+         실제 삭제는 Owen 확인 뒤 `disk-cleanup --apply` 로 손으로 한다. (서버는 11-10 부터 주 1회 자동 — 위 분기) -->
     <key>StartCalendarInterval</key>
     <dict>
         <key>Day</key><integer>1</integer>
         <key>Hour</key><integer>10</integer>
         <key>Minute</key><integer>0</integer>
     </dict>
+{{- end }}
     <key>ProcessType</key><string>Background</string>
     <key>LowPriorityIO</key><true/>
     <key>Nice</key><integer>10</integer>
