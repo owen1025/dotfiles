@@ -8,7 +8,9 @@
 # 공유(심링크): projects(세션 트랜스크립트 + 자동 메모리) · file-history · skills · plugins · settings.json · CLAUDE.md
 # 격리(계정별): 크레덴셜 · <configdir>/.claude.json · history.jsonl
 #   (크레덴셜은 macOS 에선 키체인 `Claude Code-credentials-<sha256(configdir)[:8]>`, 그 외 OS 는 .credentials.json.
-#    셸 시작 패널(claude-usage)도 같은 곳을 읽으므로 파일이 없어도 "미로그인" 으로 뜨지 않는다.)
+#    macOS 라도 키체인이 잠긴 셸 — SSH 로 붙은 셸과 거기서 띄운 tmux — 의 CLI 는 .credentials.json 을 읽고 쓴다.
+#    그래서 한 계정의 로그인이 키체인과 파일에 따로 있을 수 있다. 셸 시작 패널(claude-usage)은 둘 다 읽고
+#    살아 있는 쪽으로 조회한다 — 파일이 없어도 "미로그인", 키체인 토큰이 낡았어도 "유휴" 로 뜨지 않는다.)
 #
 # 한쪽이 리밋에 걸리면 세션 id 로 이어받는다:
 #   claude --resume <id>   ↔   claude2 --resume <id>   ↔   claude3 --resume <id>   ↔   claude4 --resume <id>
@@ -186,67 +188,76 @@ claude3() { _claude_alt "$HOME/.claude-c" "$@" }
 claude4() { _claude_alt "$HOME/.claude-d" "$@" }
 
 # ── 사용량 대시보드 ──────────────────────────────────────────────────────────
-#   claude-usage          캐시 기준으로 즉시 출력 (계정은 ~/.claude-* 자동 발견: -b→claude2, -c→claude3.
+#   claude-usage          지금 값을 출력 — 캐시가 60초보다 낡았으면 새로 조회한다(최대 1.5초 대기, 넘으면 이전 값 + 표시)
+#                         (계정은 ~/.claude-* 자동 발견: -b→claude2, -c→claude3.
 #                         디렉터리만 있고 로그인 전이면 "미로그인" 줄로 뜬다 — 남은 할 일이 로그인뿐이란 뜻)
 #                         + ChatGPT 계정 한 줄(2026-09-08): Codex CLI 로그인(~/.codex/auth.json)을 읽기만 해서
 #                           주간(플랜에 따라 5시간도) 한도를 같은 패널에 그린다. 끄기 CLAUDE_USAGE_CHATGPT=0,
 #                           다른 CODEX_HOME 은 CLAUDE_USAGE_CHATGPT="chatgpt:~/.codex-b".
 #                         ⏸ 유휴 = access token 만 만료(그 계정 CLI 가 안 돌았을 뿐) → 다음 실행 때 자동 갱신, 재로그인 불필요.
 #                         ✗ 로그인 만료 = refresh 토큰 폐기·401 → 그 계정 실행 후 /login. 전이 기록 ~/.cache/claude-usage/events.log
-#   claude-usage -r       지금 다시 조회        (= claude-limits)
+#   claude-usage -r       지금 다시 조회 (= claude-limits). 10초 안에 받은 값이 있으면 그 값 — 사용량 API 는 요청 제한이
+#                         빡빡해서(2분에 7~11번 → HTTP 429 + 4~5분 차단, 2026-11-10 실측) 연달아 부르지 않는다.
+#                         ⚠ 조회 제한 = 그 429. 직전 값을 그대로 보여 주고 서버가 알려 준 시각 뒤에 다시 조회한다.
 #   claude-usage --json   원본 JSON
 #   --style bars|panel|compact                  (기본값 $CLAUDE_USAGE_STYLE, 없으면 bars)
 alias claude-limits='claude-usage --refresh'
 alias claude-status='claude-usage --refresh'   # 예전 이름 호환
 
-# 셸 시작 시 출력. 미리 그려 둔 렌더 캐시를 cat 할 뿐이라 비용이 사실상 0이다.
-# 캐시가 낡았으면 일단 출력한 뒤 백그라운드로만 갱신하므로 셸 시작이 절대 느려지지 않는다.
+# 셸 시작 시 출력 — 새 셸에는 **지금 값**이 찍힌다(2026-11-10).
+#   · 캐시가 신선하면(CLAUDE_USAGE_TTL, 기본 60초) 미리 그려 둔 렌더 캐시를 cat 할 뿐이라 비용이 0이다.
+#   · 낡았으면 claude-usage 가 새로 조회해 이 셸에 찍는다. 기다리는 상한은 CLAUDE_USAGE_WAIT(기본 1.5초, 0이면
+#     안 기다림) — 넘으면 이전 값 + "이전 조회값" 한 줄을 찍고 갱신은 백그라운드에서 마저 돈다. `.zshrc` 맨 위의
+#     선조회가 로딩과 겹쳐 돌아서 실제로 기다리는 시간은 조회 시간(≈0.5초)보다 짧다.
+#   · 로그인 파일이 캐시보다 새로우면(/login·토큰 갱신·`codex login` 직후) TTL 안이라도 다시 조회한다 —
+#     방금 로그인했는데 새 셸에 "유휴"·"로그인 만료" 가 그대로 남지 않는다.
+#   · 유휴·로그인 만료 계정이 있으면(attention 표식) CLAUDE_USAGE_ATTENTION_TTL(10초) 뒤부터 토큰이 바뀌었는지
+#     조용히 다시 본다 — 키체인에 쓴 로그인(화면 앞 터미널)은 파일에 흔적이 없다. 이 셸은 기다리지 않는다.
+# 예전(TTL 5분 · 옛 값을 찍고 백그라운드 갱신)에는 새 값이 늘 "그다음 셸" 에서야 보였다. TTL 을 60초보다
+# 줄이지 말 것 — 사용량 API 의 요청 제한에 걸리면 4~5분 동안 아무 값도 못 받는다.
 #   끄기: CLAUDE_USAGE_STARTUP=0   /   스타일 바꾸기: CLAUDE_USAGE_STYLE=panel
 _claude_usage_startup() {
+  emulate -L zsh
   command -v claude-usage >/dev/null 2>&1 || return 0
 
   local dir="${CLAUDE_USAGE_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/claude-usage}"
   local style="${CLAUDE_USAGE_STYLE:-bars}"
   local cols="${COLUMNS:-100}"
-  local ttl="${CLAUDE_USAGE_TTL:-300}"
-  local quick="${CLAUDE_USAGE_ATTENTION_TTL:-60}"
-  local stale_max="${CLAUDE_USAGE_STALE_MAX:-86400}"
-  local render="$dir/render-${style}-${cols}.txt"
+  local ttl="${CLAUDE_USAGE_TTL:-60}"
+  local quick="${CLAUDE_USAGE_ATTENTION_TTL:-10}"
+  local render="$dir/render-${style}-${cols}.txt" state="$dir/state.json"
 
   if [[ -r $render ]]; then
     zmodload zsh/datetime
     zmodload zsh/stat
     local -A cache_stat
-    local age=$(( stale_max + 1 ))
-    if zstat -H cache_stat -- "$dir/state.json" 2>/dev/null; then
+    local -i fresh=0 age=0
+    local login
+    if zstat -H cache_stat -- "$state" 2>/dev/null; then
       age=$(( EPOCHSECONDS - cache_stat[mtime] ))
+      (( age < ttl )) && fresh=1
+      for login in "$HOME/.claude/.credentials.json" "$HOME"/.claude-?/.credentials.json(N) \
+                   "${CODEX_HOME:-$HOME/.codex}/auth.json"; do
+        [[ $login -nt $state ]] && { fresh=0; break }
+      done
     fi
-    # `command cat`: zshrc 의 cat() 은 tty 면 bat 으로 감싼다 — bat 은 테마 감지로 터미널에 색상 질의
-    # (OSC 10/11·DA1)를 보내고 늦게 온 응답이 프롬프트 입력줄에 찍히며, 화면보다 길면 페이저까지 연다
-    # (2026-09-08 "새 셸의 커서가 다른 인풋에 들어가 있다" 실측 원인). 렌더 캐시는 이미 색을 품고 있다.
-    if (( age <= stale_max )); then
+    if (( fresh )); then
+      # `command cat`: zshrc 의 cat() 은 tty 면 bat 으로 감싼다 — bat 은 테마 감지로 터미널에 색상 질의
+      # (OSC 10/11·DA1)를 보내고 늦게 온 응답이 프롬프트 입력줄에 찍히며, 화면보다 길면 페이저까지 연다
+      # (2026-09-08 "새 셸의 커서가 다른 인풋에 들어가 있다" 실측 원인). 렌더 캐시는 이미 색을 품고 있다.
       command cat -- "$render"
-    fi
-    if (( age >= ttl )); then
-      if (( age <= stale_max )); then
-        print -r -- ' ⚠ 이전 조회값 · 백그라운드 갱신 중 (`claude-usage -r` 즉시 조회)'
-      else
-        print -r -- ' ⚠ 오래된 사용량 숨김 · 백그라운드 갱신 중 (`claude-usage -r` 즉시 조회)'
+      if [[ -e $dir/attention ]] && (( age >= quick )); then
+        # 토큰이 실제로 바뀌었을 때만 claude-usage 가 갱신을 띄운다(그대로면 API 를 안 부른다) → 다음 셸에 반영.
+        ( command claude-usage --startup --quiet --style "$style" --width "$cols" &! ) >/dev/null 2>&1
       fi
-      # --startup 이 갱신 락을 잡는다. 여러 셸을 열어도 API 갱신은 하나만 실행.
-      ( command claude-usage --startup --quiet --style "$style" --width "$cols" &! ) 2>/dev/null
-    elif [[ -e $dir/attention ]] && (( age >= quick )); then
-      # 유휴·로그인 만료 계정이 있으면 TTL(5분)을 기다리지 않고 조용히 다시 본다 — 방금 `claude3` 를
-      # 띄웠거나 /login 했다면 다음 셸에 바로 반영된다(예전엔 5분간 "토큰 만료" 가 그대로 남았다).
-      # API 를 다시 부를지는 claude-usage 가 판단한다(그 계정 토큰이 실제로 바뀌었을 때만).
-      ( command claude-usage --startup --quiet --style "$style" --width "$cols" &! ) 2>/dev/null
+      return 0
     fi
-  else
-    claude-usage --startup --style "$style" --width "$cols" 2>/dev/null
   fi
+  # 낡았다 → 새로 조회해서 찍는다(갱신 프로세스는 하나만 — 여러 셸을 한꺼번에 열어도 API 는 한 번 부른다).
+  command claude-usage --startup --style "$style" --width "$cols" 2>/dev/null
 }
 
-# CLAUDECODE 가드: Claude Code 가 띄우는 셸에서는 패널을 찍지 않는다.
-if [[ -o interactive ]] && [[ -z "$CLAUDECODE" ]] && [[ "${CLAUDE_USAGE_STARTUP:-1}" == 1 ]]; then
+# 터미널이 아닌 stdout(`zsh -i -c …` 자동화)과 Claude Code 가 띄우는 셸(CLAUDECODE)에서는 패널을 찍지 않는다.
+if [[ -o interactive ]] && [[ -t 1 ]] && [[ -z "$CLAUDECODE" ]] && [[ "${CLAUDE_USAGE_STARTUP:-1}" == 1 ]]; then
   _claude_usage_startup
 fi
