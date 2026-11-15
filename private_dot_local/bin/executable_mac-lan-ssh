@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
-"""이 Mac mini의 SSH·PF 정책에 내부망 SSH와 화면 공유 접속을 추가한다."""
+"""이 Mac mini의 SSH·PF 정책에 내부망 SSH와 화면 공유 접속을 추가한다.
+
+내부망 대역은 en0/en1의 현재 주소에서 감지한다(`--subnet`으로 지정 가능).
+이미 다른 대역(예: 이전 사무실)이 허용돼 있으면 새 대역으로 바꾼다.
+"""
 
 import argparse
 import datetime
+import ipaddress
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 import tempfile
@@ -13,55 +19,144 @@ import tempfile
 
 CONFIG = Path("/etc/ssh/sshd_config.d/040-lazyowen-tailscale-only.conf")
 TAILNET = {"owen@100.64.0.0/10", "owen@fd7a:115c:a1e0::/48"}
-LAN = "owen@192.168.219.0/24"
 SSHD = "/usr/sbin/sshd"
 PF_CONFIG = Path("/Library/Application Support/lazyowen/pf-tailscale-only.conf")
 PF_ANCHOR = "com.apple/990.lazyowen"
 PFCTL = "/sbin/pfctl"
-PF_LAN_RULES = (
-    "pass in quick on { en0 en1 } inet proto tcp from 192.168.219.0/24 to any port { 22 5900 } no state\n"
-    "pass in quick on { en0 en1 } inet proto udp from 192.168.219.0/24 to any port { 5900 5901 5902 } no state\n"
-)
+IFCONFIG = "/sbin/ifconfig"
+LAN_IFACES = ("en0", "en1")
+PRIVATE = [ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")]
+MIN_PREFIX = 16  # 이보다 넓은 대역은 사무실 내부망으로 보지 않는다
+SSH_COMMENT_MARK = "기존 공개키 인증 유지, 내부망"
+PF_COMMENT_MARK = "내부망 SSH·화면 공유 허용"
+PF_BASE = [
+    'login_ports = "{ 22 88 3283 5900 }"',
+    'pass in quick on lo0 all no state',
+    'pass in quick inet proto { tcp udp } from 100.64.0.0/10 to any port $login_ports no state',
+    'pass in quick inet6 proto { tcp udp } from fd7a:115c:a1e0::/48 to any port $login_ports no state',
+    'block drop in quick proto { tcp udp } to any port $login_ports',
+]
 
 
-def updated_config(original):
+def lan_subnet(value):
+    """사설 IPv4 /16 이상 좁은 대역만 받는다. 정규화된 CIDR 문자열을 돌려준다."""
+    try:
+        network = ipaddress.ip_network(value, strict=True)
+    except ValueError as error:
+        raise ValueError(f"내부망 대역 형식이 아닙니다: {value} ({error})") from None
+    if network.version != 4 or not any(network.subnet_of(p) for p in PRIVATE):
+        raise ValueError(f"사설 IPv4 대역(10/8·172.16/12·192.168/16)만 허용합니다: {value}")
+    if network.prefixlen < MIN_PREFIX:
+        raise ValueError(f"/{MIN_PREFIX} 보다 넓은 대역은 허용하지 않습니다: {value}")
+    return str(network)
+
+
+def detect_subnet(run=subprocess.run):
+    """en0/en1 의 IPv4 주소·넷마스크로 현재 내부망 대역을 구한다."""
+    found = {}
+    for iface in LAN_IFACES:
+        result = run([IFCONFIG, iface], text=True, capture_output=True)
+        if result.returncode != 0:
+            continue
+        for ip, mask in re.findall(r"inet (\d+\.\d+\.\d+\.\d+) netmask (0x[0-9a-fA-F]{8})", result.stdout):
+            if ip.startswith("169.254."):
+                continue
+            network = ipaddress.ip_interface(f"{ip}/{ipaddress.ip_address(int(mask, 16))}").network
+            found.setdefault(str(network), []).append(f"{iface} {ip}")
+    if not found:
+        raise ValueError("en0/en1 에 IPv4 주소가 없습니다. --subnet 으로 지정하세요.")
+    if len(found) > 1:
+        detail = ", ".join(f"{net} ({'; '.join(v)})" for net, v in found.items())
+        raise ValueError(f"en0/en1 대역이 서로 다릅니다: {detail}. --subnet 으로 지정하세요.")
+    subnet = next(iter(found))
+    return lan_subnet(subnet), found[subnet]
+
+
+def lan_user(subnet):
+    return f"owen@{subnet}"
+
+
+def pf_lan_rules(subnet):
+    return (
+        f"pass in quick on {{ en0 en1 }} inet proto tcp from {subnet} to any port {{ 22 5900 }} no state\n"
+        f"pass in quick on {{ en0 en1 }} inet proto udp from {subnet} to any port {{ 5900 5901 5902 }} no state\n"
+    )
+
+
+def today():
+    return datetime.date.today().isoformat()
+
+
+def updated_config(original, subnet):
+    lan = lan_user(subnet)
     lines = original.splitlines(keepends=True)
     matches = [i for i, line in enumerate(lines)
                if line.split() and line.split()[0].lower() == "allowusers"]
     if len(matches) != 1:
         raise ValueError("AllowUsers가 정확히 한 줄인 기존 설정만 수정합니다.")
     index = matches[0]
-    users = set(lines[index].split()[1:])
-    if users not in (TAILNET, TAILNET | {LAN}):
+    tokens = lines[index].split()
+    users = set(tokens[1:])
+    extra = users - TAILNET
+    if not TAILNET <= users or len(extra) > 1:
         raise ValueError("예상과 다른 SSH 허용 목록입니다. 기존 설정을 검토하세요.")
-    if users == TAILNET | {LAN}:
-        return original
-    lines[index] = lines[index].rstrip("\r\n") + " " + LAN + "\n"
-    lines.insert(index, "# 2026-10-19 Owen 요청: 기존 공개키 인증 유지, 내부망 192.168.219.0/24 추가.\n")
+    if extra:
+        old = next(iter(extra))
+        if not old.startswith("owen@"):
+            raise ValueError("예상과 다른 SSH 허용 목록입니다. 기존 설정을 검토하세요.")
+        lan_subnet(old[len("owen@"):])  # 이 도구가 넣은 내부망 항목인지 확인
+        if old == lan:
+            return original
+    kept = [t for t in tokens[1:] if t in TAILNET]
+    lines[index] = " ".join([tokens[0], *kept, lan]) + "\n"
+    comment = f"# {today()} Owen 요청: {SSH_COMMENT_MARK} {subnet} 허용.\n"
+    if index > 0 and lines[index - 1].lstrip().startswith("#") and SSH_COMMENT_MARK in lines[index - 1]:
+        lines[index - 1] = comment
+    else:
+        lines.insert(index, comment)
     return "".join(lines)
 
 
-def updated_pf(original):
-    expected = [
-        'login_ports = "{ 22 88 3283 5900 }"',
-        'pass in quick on lo0 all no state',
-        'pass in quick inet proto { tcp udp } from 100.64.0.0/10 to any port $login_ports no state',
-        'pass in quick inet6 proto { tcp udp } from fd7a:115c:a1e0::/48 to any port $login_ports no state',
-        'block drop in quick proto { tcp udp } to any port $login_ports',
-    ]
-    clean = lambda text: [" ".join(line.split()) for line in text.splitlines()
-                          if line.strip() and not line.lstrip().startswith("#")]
-    actual = clean(original)
-    if actual == expected[:-1] + clean(PF_LAN_RULES) + expected[-1:]:
+def _clean(text):
+    return [" ".join(line.split()) for line in text.splitlines()
+            if line.strip() and not line.lstrip().startswith("#")]
+
+
+def current_pf_subnet(original):
+    """이 도구가 넣은 내부망 규칙의 대역. 기본 규칙만 있으면 None. 그 밖의 모양은 거부한다."""
+    actual = _clean(original)
+    if actual == PF_BASE:
+        return None
+    if len(actual) == len(PF_BASE) + 2 and actual[:-3] == PF_BASE[:-1] and actual[-1] == PF_BASE[-1]:
+        found = re.search(r" from (\S+) to any port ", actual[-3])
+        if found:
+            try:
+                subnet = lan_subnet(found.group(1))
+            except ValueError:
+                subnet = None
+            if subnet and actual[-3:-1] == _clean(pf_lan_rules(subnet)):
+                return subnet
+    raise ValueError("예상과 다른 PF 규칙입니다. 기존 방화벽을 덮지 않습니다.")
+
+
+def updated_pf(original, subnet):
+    old = current_pf_subnet(original)
+    if old == subnet:
         return original
-    if actual != expected:
+    base = original
+    if old is not None:
+        drop = set(_clean(pf_lan_rules(old)))
+        base = "".join(line for line in original.splitlines(keepends=True)
+                       if " ".join(line.split()) not in drop
+                       and not (line.lstrip().startswith("#") and PF_COMMENT_MARK in line))
+    if _clean(base) != PF_BASE or base.count(PF_BASE[-1]) != 1:
         raise ValueError("예상과 다른 PF 규칙입니다. 기존 방화벽을 덮지 않습니다.")
-    return original.replace(expected[-1],
-                            "# 2026-10-19 Owen: 내부망 SSH·화면 공유 허용, 외부 차단 유지\n"
-                            + PF_LAN_RULES + expected[-1])
+    return base.replace(PF_BASE[-1],
+                        f"# {today()} Owen: {PF_COMMENT_MARK} ({subnet}), 외부 차단 유지\n"
+                        + pf_lan_rules(subnet) + PF_BASE[-1])
 
 
-def apply_ssh(original, updated):
+def apply_ssh(original, updated, subnet):
     if original == updated:
         print("SSH 내부망 허용: 이미 적용됨")
         return
@@ -87,7 +182,7 @@ def apply_ssh(original, updated):
                 raise ValueError("기존 공개키 전용 인증 정책 검증 실패")
             allowed = [line.split(" ", 1)[1] for line in result.stdout.splitlines()
                        if line.startswith("allowusers ")]
-            if set(" ".join(allowed).split()) != TAILNET | {LAN}:
+            if set(" ".join(allowed).split()) != TAILNET | {lan_user(subnet)}:
                 raise ValueError("실제 SSH 허용 목록 검증 실패")
         except Exception:
             shutil.copy2(backup, candidate)
@@ -97,12 +192,16 @@ def apply_ssh(original, updated):
     print(f"SSH 적용 완료. 백업: {backup}")
 
 
-def apply_pf(original, updated):
+def apply_pf(original, updated, subnet):
     # 전체 PF를 끄거나 재로드하지 않고, 기존 사용자 앵커만 갱신한다.
     live = subprocess.run([PFCTL, "-a", PF_ANCHOR, "-s", "rules"],
                           check=True, text=True, capture_output=True).stdout
     if not live.strip():
         raise ValueError("기존 PF 앵커가 비어 있습니다. 다른 차단 원인을 확인하세요.")
+    if original == updated and f"from {subnet}" in live:
+        print("PF 내부망 허용: 이미 적용됨")
+        return
+    old = current_pf_subnet(original)
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     backup = PF_CONFIG.with_name(PF_CONFIG.name + ".backup-" + stamp)
     live_backup = PF_CONFIG.with_name("pf-live.backup-" + stamp)
@@ -120,8 +219,10 @@ def apply_pf(original, updated):
             subprocess.run([PFCTL, "-q", "-a", PF_ANCHOR, "-f", str(PF_CONFIG)], check=True)
             rules = subprocess.run([PFCTL, "-a", PF_ANCHOR, "-s", "rules"],
                                    check=True, text=True, capture_output=True).stdout
-            if "from 192.168.219.0/24" not in rules or "block drop in quick" not in rules:
+            if f"from {subnet}" not in rules or "block drop in quick" not in rules:
                 raise ValueError("PF 내부망 허용·기존 외부 차단 검증 실패")
+            if old and old != subnet and f"from {old}" in rules:
+                raise ValueError(f"이전 대역 {old} 규칙이 남아 있습니다")
         except Exception:
             shutil.copy2(backup, candidate)
             os.chmod(candidate, 0o644)
@@ -133,16 +234,24 @@ def apply_pf(original, updated):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--apply", action="store_true", help="관리자 권한으로 적용 (기본: 미리보기)")
+    parser.add_argument("--subnet", help="허용할 내부망 대역 (기본: en0/en1 에서 감지, 예: 192.168.45.0/24)")
     args = parser.parse_args()
     if platform.system() != "Darwin":
         parser.error("macOS 전용입니다.")
     for path in (CONFIG, PF_CONFIG):
         if path.is_symlink() or not path.is_file():
             parser.error(f"기존 일반 파일이 필요합니다: {path}")
+    if args.subnet:
+        subnet = lan_subnet(args.subnet)
+        print(f"내부망 대역: {subnet} (지정)")
+    else:
+        subnet, seen = detect_subnet()
+        print(f"내부망 대역: {subnet} (감지: {', '.join(seen)})")
     original, pf_original = CONFIG.read_text(), PF_CONFIG.read_text()
-    updated, pf_updated = updated_config(original), updated_pf(pf_original)
+    updated, pf_updated = updated_config(original, subnet), updated_pf(pf_original, subnet)
     if not args.apply:
         import difflib
         for path, before, after in ((CONFIG, original, updated), (PF_CONFIG, pf_original, pf_updated)):
@@ -156,8 +265,8 @@ def main():
         return
     if os.geteuid() != 0:
         parser.error("관리자 인증이 필요합니다: sudo ~/.local/bin/mac-lan-ssh --apply")
-    apply_ssh(original, updated)
-    apply_pf(pf_original, pf_updated)
+    apply_ssh(original, updated, subnet)
+    apply_pf(pf_original, pf_updated, subnet)
     print("내부망 SSH·화면 공유 허용 완료. 기존 Tailscale·공개키 인증·외부 차단 유지.")
     print("다른 기기에서 실제 접속을 확인하세요. 실행 중인 세션은 유지됩니다.")
 
