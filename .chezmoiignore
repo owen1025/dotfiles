@@ -19,4 +19,10 @@ docs
 Library/**
 Documents/EdgeMark/**
 {{- end }}
+
+# 2026-11-15: studio.local 알림은 서버 맥(M6)만 — 다른 맥이 띄우면 그 맥 IP 로 studio.local 을 가로챈다
+{{ if ne .chezmoi.hostname "owen-lolui-Macmini" -}}
+.local/bin/studio-lan-name
+Library/LaunchAgents/com.owen.studio-lan-name.plist
+{{- end }}
 .claude/**

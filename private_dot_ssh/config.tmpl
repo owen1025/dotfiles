@@ -20,6 +20,15 @@ Host studio-kr
     HostKeyAlias studio-kr
 
 {{ end -}}
+{{ if ne .chezmoi.hostname "owen-lolui-Macmini" -}}
+# 2026-11-15 Owen: 같은 내부망에서 서버(M6)로 — Tailscale 없이 studio.local(서버가 Bonjour 로 알림, 내부망 IP).
+# HostKeyAlias studio-kr = 서버 키를 tailnet 주소와 같은 이름으로 확인(m4 known_hosts 에 이미 있다).
+Host studio-lan
+    HostName studio.local
+    HostKeyAlias studio-kr
+    User owen
+
+{{ end -}}
 {{ end -}}
 Host *
 {{ if eq .chezmoi.os "darwin" -}}

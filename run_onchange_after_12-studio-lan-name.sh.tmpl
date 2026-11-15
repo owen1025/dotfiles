@@ -1,0 +1,16 @@
+{{ if and (eq .chezmoi.os "darwin") (eq .chezmoi.hostname "owen-lolui-Macmini") -}}
+#!/bin/bash
+# after 단계: 바이너리와 plist 가 배포된 뒤 등록한다(서버 맥 전용 — 다른 맥은 .chezmoiignore 로 파일도 없다).
+# script hash: {{ include "private_dot_local/bin/executable_studio-lan-name" | sha256sum }}
+# plist hash: {{ include "private_Library/private_LaunchAgents/com.owen.studio-lan-name.plist.tmpl" | sha256sum }}
+set -euo pipefail
+
+LABEL=com.owen.studio-lan-name
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+[[ -x "$HOME/.local/bin/studio-lan-name" && -f "$PLIST" ]]
+/usr/bin/plutil -lint "$PLIST"
+/bin/launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+/bin/launchctl enable "gui/$(id -u)/$LABEL"
+/bin/launchctl bootstrap "gui/$(id -u)" "$PLIST"
+echo "studio-lan-name: 같은 내부망에 studio.local 알림 launchd 등록(점검: studio-lan-name --check)"
+{{ end -}}

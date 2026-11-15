@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+"""같은 내부망에서 이 Mac mini(studio)를 studio.local 로 부를 수 있게 Bonjour 로 이름을 알린다.
+
+호스트 이름(owen-lolui-Macmini)은 dotfiles 템플릿이 분기에 쓰므로 그대로 두고,
+dns-sd 프록시 등록으로 studio.local → 현재 내부망 IPv4(유선 en0 우선)를 덧붙인다.
+IP 가 바뀌거나 dns-sd 가 끝나면 다시 등록한다. LaunchAgent com.owen.studio-lan-name 이 띄운다.
+
+    studio-lan-name           # 상시 실행(launchd 용)
+    studio-lan-name --check   # 알릴 IP 와 studio.local 해석 결과 비교, 맞으면 종료 코드 0
+"""
+
+import argparse
+import ipaddress
+import re
+import signal
+import socket
+import subprocess
+import sys
+import time
+
+
+NAME = "studio"
+HOST = f"{NAME}.local"
+IFACES = ("en0", "en1")  # 유선 우선
+DNS_SD = "/usr/bin/dns-sd"
+IFCONFIG = "/sbin/ifconfig"
+PRIVATE = [ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")]
+INTERVAL = 30
+
+
+def lan_ip(run=subprocess.run):
+    """(인터페이스, IPv4) — en0 → en1 순으로 활성 사설 주소를 찾는다. 없으면 None."""
+    for iface in IFACES:
+        result = run([IFCONFIG, iface], text=True, capture_output=True)
+        if result.returncode != 0 or "status: inactive" in result.stdout:
+            continue
+        for ip in re.findall(r"\binet (\d+\.\d+\.\d+\.\d+) netmask", result.stdout):
+            if any(ipaddress.ip_address(ip) in net for net in PRIVATE):
+                return iface, ip
+    return None
+
+
+def register_command(ip):
+    # _device-info 는 Finder 네트워크 목록에 새 항목을 만들지 않는다. 포트 0 = 이름(A 레코드)만 알림.
+    return [DNS_SD, "-P", NAME, "_device-info._tcp", "local", "0", HOST, ip, "model=Macmini"]
+
+
+def log(message):
+    print(time.strftime("%Y-%m-%d %H:%M:%S"), message, flush=True)
+
+
+class Advertiser:
+    def __init__(self, popen=subprocess.Popen, find=lan_ip):
+        self.popen, self.find = popen, find
+        self.child, self.ip = None, None
+
+    def stop(self):
+        if self.child is not None and self.child.poll() is None:
+            self.child.terminate()
+            try:
+                self.child.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.child.kill()
+        self.child = None
+
+    def tick(self):
+        """한 번 점검 — IP 가 바뀌었거나 dns-sd 가 끝났으면 다시 등록한다."""
+        found = self.find()
+        ip = found[1] if found else None
+        if self.child is not None and self.child.poll() is not None:
+            log(f"dns-sd 종료(코드 {self.child.returncode}) — 다시 등록")
+            self.child = None
+        if ip == self.ip and (ip is None or self.child is not None):
+            return
+        self.stop()
+        if ip:
+            log(f"{HOST} → {ip} ({found[0]}) 등록")
+            self.child = self.popen(register_command(ip), stdout=sys.stdout, stderr=subprocess.STDOUT)
+        elif self.ip:
+            log("내부망 IPv4 없음 — 알림 중지, 대기")
+        self.ip = ip
+
+
+def check():
+    found = lan_ip()
+    if not found:
+        print("내부망 IPv4 없음(en0/en1)")
+        return 1
+    try:
+        resolved = sorted({info[4][0] for info in socket.getaddrinfo(HOST, None, socket.AF_INET)})
+    except socket.gaierror as error:
+        resolved = [f"해석 실패: {error}"]
+    ok = found[1] in resolved and len(resolved) == 1
+    print(f"알릴 주소: {found[1]} ({found[0]})")
+    print(f"{HOST} 해석: {', '.join(resolved)}")
+    if not ok:
+        print("불일치 — `launchctl print gui/$(id -u)/com.owen.studio-lan-name` 와 "
+              "~/Library/Logs/studio-lan-name.log 를 확인하세요. 알림이 꺼져 있으면 통신사 DNS 가 "
+              "광고 서버 주소를 돌려줄 수 있습니다.")
+    return 0 if ok else 1
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--check", action="store_true", help="알릴 IP 와 해석 결과만 비교")
+    parser.add_argument("--interval", type=int, default=INTERVAL, help=argparse.SUPPRESS)
+    args = parser.parse_args()
+    if args.check:
+        return check()
+    advertiser = Advertiser()
+
+    def finish(*_):
+        advertiser.stop()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, finish)
+    signal.signal(signal.SIGINT, finish)
+    while True:
+        advertiser.tick()
+        time.sleep(args.interval)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

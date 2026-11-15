@@ -8,6 +8,30 @@ DHCP 주소이므로 바뀔 수 있다. 이전 사무실(2026-10-19)은 `192.168
 허용). 새 망에 붙은 뒤 아래 `mac-lan-ssh`를 다시 적용하면 대역을 감지해 교체한다.
 Tailscale 주소(`100.74.65.14`) 접속은 위치와 무관하게 계속 된다.
 
+## 이름으로 접속: `studio.local` (2026-11-15)
+
+같은 내부망에서는 IP 대신 **`studio.local`** 을 쓴다. 이 Mac이 LaunchAgent
+`com.owen.studio-lan-name`(`~/.local/bin/studio-lan-name`)으로 Bonjour에
+`studio.local` → 현재 내부망 IPv4(유선 en0 우선, 없으면 Wi-Fi en1)를 알린다.
+IP가 바뀌거나 `dns-sd`가 끝나면 30초 안에 다시 등록한다. 외부 DNS에는 아무것도
+올리지 않는다.
+
+- 화면 공유: `vnc://studio.local`
+- SSH: 다른 맥(m4·맥북)의 `ssh studio-lan`(dotfiles `~/.ssh/config`, 키 확인은
+  tailnet 별칭 `studio-kr`과 같은 키) 또는 `ssh owen@studio.local`
+- 점검(이 Mac): `studio-lan-name --check` → 알릴 주소와 해석 결과가 같으면 종료 코드 0.
+  로그 `~/Library/Logs/studio-lan-name.log`
+
+호스트 이름 자체(`owen-lolui-Macmini`)는 바꾸지 않았다. dotfiles 템플릿
+(`authorized_keys`·Brewfile·disk-cleanup·ssh config)이 그 이름으로 분기한다.
+`owen-lolui-Macmini.local`도 그대로 된다. 이 알림은 서버 맥에만 배포한다
+(`.chezmoiignore`) — 다른 맥이 띄우면 그 맥 IP로 `studio.local`을 가로챈다.
+
+⚠ 통신사(SK) DNS는 없는 이름에도 광고 서버 `218.38.137.27`을 돌려준다
+(2026-11-15 실측, `dns-sd -G v4 studio.local`의 인터페이스 0 줄). 알림이 살아 있으면
+Bonjour 응답이 쓰이지만, 꺼져 있으면 `studio.local`이 그 주소로 풀릴 수 있다 —
+연결이 안 되면 먼저 `--check`. SSH는 호스트 키가 달라 접속을 거부하므로 안전하다.
+
 ## SSH / mosh
 
 원격 로그인과 mosh는 이미 설치·활성화되어 있다. 차단은 두 겹이다.
