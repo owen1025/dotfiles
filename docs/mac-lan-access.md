@@ -27,10 +27,16 @@ IP가 바뀌거나 `dns-sd`가 끝나면 30초 안에 다시 등록한다. 외�
 `owen-lolui-Macmini.local`도 그대로 된다. 이 알림은 서버 맥에만 배포한다
 (`.chezmoiignore`) — 다른 맥이 띄우면 그 맥 IP로 `studio.local`을 가로챈다.
 
-⚠ 통신사(SK) DNS는 없는 이름에도 광고 서버 `218.38.137.27`을 돌려준다
-(2026-11-15 실측, `dns-sd -G v4 studio.local`의 인터페이스 0 줄). 알림이 살아 있으면
-Bonjour 응답이 쓰이지만, 꺼져 있으면 `studio.local`이 그 주소로 풀릴 수 있다 —
-연결이 안 되면 먼저 `--check`. SSH는 호스트 키가 달라 접속을 거부하므로 안전하다.
+⚠ 통신사(SK) DNS(`210.220.163.82` 등, DHCP가 그대로 준다)는 없는 이름에도
+광고 서버 `218.38.137.27`을 NOERROR로 돌려준다 — `.local`도 마찬가지라 macOS가
+Bonjour 결과에 이 주소를 섞는다(Tailscale DNS도 이 서버로 넘기므로 같다. 1.1.1.1은
+NXDOMAIN). 2026-11-15 m4 실측: `studio.local` → `[192.168.45.212, 192.168.45.212,
+218.38.137.27]`, 기존 `owen-lolui-Macmini.local`도 같은 꼴. Bonjour 주소가 앞에 와서
+화면 공유·SSH는 내부망으로 붙고(`ssh studio-lan` 0.17초, `SSH_CONNECTION`
+`192.168.45.231 → 192.168.45.212`), 그 광고 서버의 5900은 닫혀 있다. 알림이 꺼지면
+그 주소만 남으니 연결이 안 되면 먼저 `--check`(Bonjour 응답만 본다). SSH는
+호스트 키가 달라 거부하므로 안전하다. 없애려면 DNS를 1.1.1.1 등으로 바꾼다
+(맥별 `networksetup -setdnsservers`, 또는 Tailscale 관리 콘솔 Global nameservers).
 
 ## SSH / mosh
 

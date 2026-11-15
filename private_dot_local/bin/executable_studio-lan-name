@@ -81,22 +81,44 @@ class Advertiser:
         self.ip = ip
 
 
+def mdns_addresses(output):
+    """`dns-sd -G v4` 출력에서 Bonjour(인터페이스 번호 ≠ 0) 응답 주소만. 0 은 일반 DNS 응답이다."""
+    found = set()
+    for line in output.splitlines():
+        fields = line.split()
+        if len(fields) >= 6 and fields[1] == "Add" and fields[3] != "0" and fields[4].rstrip(".") == HOST:
+            found.add(fields[5])
+    return found
+
+
+def query_mdns(seconds=2.5):
+    child = subprocess.Popen([DNS_SD, "-G", "v4", HOST], stdout=subprocess.PIPE,
+                             stderr=subprocess.DEVNULL, text=True)
+    time.sleep(seconds)
+    child.terminate()
+    return mdns_addresses(child.communicate(timeout=5)[0])
+
+
 def check():
     found = lan_ip()
     if not found:
         print("내부망 IPv4 없음(en0/en1)")
         return 1
+    mdns = query_mdns()
     try:
-        resolved = sorted({info[4][0] for info in socket.getaddrinfo(HOST, None, socket.AF_INET)})
-    except socket.gaierror as error:
-        resolved = [f"해석 실패: {error}"]
-    ok = found[1] in resolved and len(resolved) == 1
+        resolved = {info[4][0] for info in socket.getaddrinfo(HOST, None, socket.AF_INET)}
+    except socket.gaierror:
+        resolved = set()
+    ok = mdns == {found[1]}
     print(f"알릴 주소: {found[1]} ({found[0]})")
-    print(f"{HOST} 해석: {', '.join(resolved)}")
+    print(f"Bonjour 응답: {', '.join(sorted(mdns)) or '없음'}")
     if not ok:
         print("불일치 — `launchctl print gui/$(id -u)/com.owen.studio-lan-name` 와 "
-              "~/Library/Logs/studio-lan-name.log 를 확인하세요. 알림이 꺼져 있으면 통신사 DNS 가 "
-              "광고 서버 주소를 돌려줄 수 있습니다.")
+              "~/Library/Logs/studio-lan-name.log 를 확인하세요.")
+    extra = resolved - mdns
+    if extra:
+        print(f"참고: 일반 DNS 가 {', '.join(sorted(extra))} 도 돌려준다(통신사 DNS 가 없는 이름에 주는 "
+              "광고 서버 주소). Bonjour 주소가 앞에 와서 접속에는 쓰이지 않는다.")
     return 0 if ok else 1
 
 

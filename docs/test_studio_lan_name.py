@@ -59,6 +59,19 @@ class StudioLanNameTests(unittest.TestCase):
         self.assertIn("_device-info._tcp", command)  # Finder 네트워크 목록에 새 항목을 만들지 않는다
         self.assertEqual(command[command.index("local") + 1], "0")
 
+    def test_mdns_answers_exclude_unicast_dns(self):
+        # 2026-11-15 m4 실측 출력 — 인터페이스 0 줄은 통신사 DNS 가 없는 이름에 준 광고 서버 주소.
+        output = """DATE: ---Sun 15 Nov 2026---
+23:03:35.439  ...STARTING...
+Timestamp     A/R  Flags         IF  Hostname                               Address                                      TTL
+23:03:35.439  Add  40000003       7  studio.local.                          192.168.45.212                               240
+23:03:35.439  Add  40000002      16  studio.local.                          192.168.45.212                               240
+23:03:35.444  Add  2              0  studio.local.                          218.38.137.27                                4320
+23:03:40.000  Rmv  0              7  studio.local.                          192.168.45.99                                0
+"""
+        self.assertEqual(self.module["mdns_addresses"](output), {"192.168.45.212"})
+        self.assertEqual(self.module["mdns_addresses"](""), set())
+
     def test_reregisters_on_ip_change_and_child_exit(self):
         started, state = [], {"found": ("en0", "192.168.45.212")}
 
