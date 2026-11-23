@@ -82,6 +82,7 @@ class Osc52CopyTests(unittest.TestCase):
                         XDG_STATE_HOME=str(self.root / "state"), TMUX_OSC52_DECOY_WAIT="0.05",
                         TMPDIR=str(self.root))
         self.sock = "o52t"
+        self.server_pid = None
         self.clients = []
         self.addCleanup(self.cleanup)
 
@@ -89,6 +90,12 @@ class Osc52CopyTests(unittest.TestCase):
         for c in self.clients:
             c.close()
         subprocess.run([TMUX, "-L", self.sock, "kill-server"], env=self.env, capture_output=True)
+        # 소켓이 지워진 서버는 kill-server 가 못 닿는다 — 알아 둔 pid 로 직접 끈다(안 그러면 서버가 남는다)
+        if self.server_pid:
+            try:
+                os.kill(self.server_pid, signal.SIGKILL)
+            except OSError:
+                pass
 
     def tm(self, *args, check=True):
         r = subprocess.run([TMUX, "-L", self.sock, *args], env=self.env, capture_output=True, text=True)
@@ -100,6 +107,9 @@ class Osc52CopyTests(unittest.TestCase):
         c = Client(self.env, self.sock, session)
         self.clients.append(c)
         c.read(1.0)
+        if self.server_pid is None:
+            out = self.tm("display", "-p", "#{pid}", check=False).strip()
+            self.server_pid = int(out) if out.isdigit() else None
         return c
 
     def run_script(self, data, *args, tmux_env=True):
