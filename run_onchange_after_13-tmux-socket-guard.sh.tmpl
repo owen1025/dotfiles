@@ -1,0 +1,22 @@
+{{ if eq .chezmoi.os "darwin" -}}
+#!/bin/bash
+# tmux-socket-guard LaunchAgent 를 (다시) 올린다 — plist·스크립트가 바뀔 때마다 실행.
+# after 단계: 바이너리와 plist 가 배포된 뒤 등록한다.
+# script hash: {{ include "private_dot_local/bin/executable_tmux-socket-guard" | sha256sum }}
+# plist hash: {{ include "private_Library/private_LaunchAgents/com.owen.tmux-socket-guard.plist.tmpl" | sha256sum }}
+set -euo pipefail
+
+LABEL=com.owen.tmux-socket-guard
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+[[ -x "$HOME/.local/bin/tmux-socket-guard" && -f "$PLIST" ]] || { echo "WARN: $PLIST 또는 tmux-socket-guard 가 없다 — chezmoi apply 순서 확인" >&2; exit 0; }
+# 손으로 disable 해 둔 맥에선 bootstrap 이 실패해 apply 전체가 멈추므로 그 상태를 지키고 건너뛴다(chrome-automation-gc 와 같은 규칙).
+if launchctl print-disabled "gui/$(id -u)" | grep -Eq "\"$LABEL\" => (disabled|true)"; then
+	echo "tmux-socket-guard: 이 맥에선 꺼 둔 상태(launchctl disable)라 등록을 건너뜀"
+	exit 0
+fi
+/usr/bin/plutil -lint "$PLIST" >/dev/null
+
+launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$PLIST"
+echo "tmux-socket-guard: launchd 등록 (1시간마다, 점검: tmux-socket-guard --check, 로그 ~/Library/Logs/tmux-socket-guard.log)"
+{{ end -}}

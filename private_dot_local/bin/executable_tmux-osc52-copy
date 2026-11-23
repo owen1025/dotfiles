@@ -1,68 +1,110 @@
 #!/bin/sh
-# tmux-osc52-copy: Send data to clipboard via OSC 52 written directly
-# to the active tmux client's outer TTY (mosh-compatible, no tmux passthrough).
+# tmux-osc52-copy — tmux 에서 복사한 텍스트를 OSC 52 로 "지금 붙어 있는 터미널(Ghostty)"
+# 클립보드에 보낸다. tmux 서버가 원격 맥(m6)에 있어도 손앞 맥의 클립보드로 간다.
 #
-# Why not pane_tty + DCS passthrough?
-#   tmux strips the DCS wrap and forwards the inner OSC 52 to ITS controlling
-#   terminal — which for a mosh session is the mosh-server's internal pty,
-#   not the pty that mosh forwards to the client. Result: OSC 52 is
-#   consumed server-side and never reaches the client's outer terminal.
-#   Empirically reproduced on tmux 3.6a + mosh 1.4.0 + Ghostty.
-#   See: https://github.com/mobile-shell/mosh/pull/1104 (delbao comment, 2022)
+#   copy-command 로 불린다(`set -s copy-command tmux-osc52-copy`): 드래그·y·Enter·더블/트리플
+#   클릭·C-j 가 전부 이 길 — 선택한 텍스트가 stdin 으로 온다.
+#   직접도 쓴다: `echo hi | tmux-osc52-copy`, `.zshrc` 의 pbcopy alias(Linux).
+#   tty 를 인자로 주면 그 tty 로만 보낸다: `tmux-osc52-copy /dev/ttys008`
 #
-# Why client_tty works:
-#   Each attached tmux client has its own slave pty (#{client_tty}) which
-#   is the *outer* terminal as tmux sees it. For a mosh client that pty is
-#   owned by the mosh-server process — writing OSC 52 there goes straight
-#   through UDP to the mosh-client and into Ghostty's clipboard. No tmux
-#   passthrough / DCS wrap needed. Works identically for local Ghostty.
+# 왜 tmux 내장 set-clipboard 가 아니라 client tty 에 직접 쓰나:
+#   tmux 내장은 OSC 52 의 선택 파라미터를 비워 `ESC ] 52 ; ; <b64>` 로 내보내는데, mosh 1.4.0 은
+#   `52;c;` 로 시작하는 것만 클립보드로 받는다(terminalfunctions.cc OSC_dispatch). 그래서
+#   `52;c;` 를 우리가 직접 만들어 #{client_tty} 에 쓴다. 그 tty 가 mosh-server 의 pty 라서
+#   mosh → Ghostty → macOS 클립보드로 간다. 일반 ssh·로컬 Ghostty 도 똑같이 된다.
 #
-# Data source:
-#   - If stdin is a pipe/redirect with actual data: read from stdin
-#     → enables `cat file | tmux-osc52-copy`, `echo foo | tmux-osc52-copy`, etc.
-#   - Otherwise (empty stdin, tty, or `run-shell -b`): read from tmux buffer
-#     → preserves tmux copy-mode binding (run-shell -b 'tmux-osc52-copy')
+# "가끔 된다/안 된다" 의 원인 셋과 이 스크립트의 대응 (2026-11-23 실측):
+#   1. tmux 소켓이 지워짐 — 맥 /usr/libexec/tmp_cleaner(매일 00:00)가 atime·mtime·ctime 이 모두
+#      3일 넘은 /private/tmp 파일을 지운다. 서버가 오래 살아 있고 attach/detach 가 없으면 소켓
+#      (/private/tmp/tmux-UID/default)이 지워져 `tmux …` 가 전부 "error connecting" — 이
+#      스크립트의 list-clients·save-buffer 도 죽어 아무 데도 안 보내고 조용히 끝났다.
+#      → tmux 를 부르기 전에 소켓이 없으면 서버에 SIGUSR1 을 보내 되살린다(tmux 문서의 복구법).
+#        예방은 tmux-socket-guard(LaunchAgent)가 한다.
+#   2. 더블/트리플클릭·C-j 는 이 스크립트를 안 거치고 tmux 버퍼에만 담겼다 → copy-command.
+#   3. mosh 는 클립보드 문자열이 직전 상태와 같으면 전달하지 않는다(terminaldisplay.cc
+#      `get_clipboard() != last_frame.get_clipboard()`). 같은 텍스트를 연달아 다시 복사하면
+#      그 사이 맥 클립보드가 바뀌었어도 안 간다 → 같은 tty 에 같은 내용을 또 보내는 때만
+#      뒤에 공백을 붙인 값을 먼저 보내 상태를 바꾸고(DECOY_WAIT 초 대기) 진짜 값을 보낸다.
 #
-# IMPORTANT: `tmux run-shell -b` spawns the subprocess with stdin = non-TTY
-# AND empty (not a real pipe). So `[ ! -t 0 ]` alone cannot distinguish
-# "real pipe with data" from "run-shell empty stdin" — we must also check
-# whether `cat` returned anything, and fall through to `save-buffer` if not.
-# Without this fallthrough, the keybinding path emits an EMPTY OSC 52,
-# which clobbers the clipboard with "". Confirmed on tmux 3.6a.
-set -eu
+# 기록: ~/.local/state/tmux-osc52/events.log (소켓 복구·대상 없음·쓰기 실패·재전송만 남긴다)
+set -u
 
-raw=''
-if [ ! -t 0 ]; then
-  raw=$(cat)
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/tmux-osc52"
+LOG="$STATE_DIR/events.log"
+DECOY_WAIT="${TMUX_OSC52_DECOY_WAIT:-0.35}"
+
+log() {
+	mkdir -p "$STATE_DIR" 2>/dev/null || return 0
+	if [ -f "$LOG" ] && [ "$(wc -c <"$LOG" 2>/dev/null || echo 0)" -gt 65536 ]; then
+		tail -n 200 "$LOG" >"$LOG.tmp" 2>/dev/null && mv "$LOG.tmp" "$LOG" 2>/dev/null
+	fi
+	printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$LOG" 2>/dev/null || :
+}
+
+# $TMUX = <소켓 경로>,<서버 pid>,<세션 id>. 소켓 파일이 없고 서버가 살아 있으면 되살린다.
+heal_socket() {
+	[ -n "${TMUX:-}" ] || return 0
+	sock=${TMUX%%,*}
+	rest=${TMUX#*,}
+	pid=${rest%%,*}
+	[ -S "$sock" ] && return 0
+	case $pid in '' | *[!0-9]*) return 0 ;; esac
+	kill -0 "$pid" 2>/dev/null || return 0
+	mkdir -p -m 700 "$(dirname "$sock")" 2>/dev/null || :
+	kill -USR1 "$pid" 2>/dev/null || return 0
+	i=0
+	while [ ! -S "$sock" ] && [ "$i" -lt 40 ]; do
+		sleep 0.05
+		i=$((i + 1))
+	done
+	if [ -S "$sock" ]; then log "소켓 복구 $sock (서버 pid $pid)"; else log "소켓 복구 실패 $sock (서버 pid $pid)"; fi
+}
+
+tmp=$(mktemp "${TMPDIR:-/tmp}/tmux-osc52.XXXXXX") || exit 0
+trap 'rm -f "$tmp"' EXIT HUP INT TERM
+
+# 데이터: stdin(copy-command·파이프) → 비었으면 tmux 버퍼(옛 run-shell 바인딩 호환)
+if [ ! -t 0 ]; then cat >"$tmp" 2>/dev/null || :; fi
+if [ ! -s "$tmp" ]; then
+	heal_socket
+	tmux save-buffer - >"$tmp" 2>/dev/null || :
 fi
-if [ -z "$raw" ]; then
-  raw=$(tmux save-buffer - 2>/dev/null || printf '')
+# 복사할 게 없으면 클립보드를 빈 값으로 덮지 않는다.
+[ -s "$tmp" ] || exit 0
+
+buf=$(base64 <"$tmp" | tr -d '\r\n')
+
+# 대상 tty: 인자 > tmux 클라이언트(가장 최근에 키·마우스를 쓴 것) > 컨트롤 tty
+# client_activity 는 초 단위라 같은 초에 겹치면 그 둘 다에 보낸다.
+if [ "$#" -gt 0 ]; then
+	targets="$*"
+elif [ -n "${TMUX:-}" ]; then
+	heal_socket
+	targets=$(tmux list-clients -F '#{client_activity} #{client_tty}' 2>/dev/null |
+		sort -rn | awk 'NR==1{m=$1} $1==m{print $2}')
+	[ -n "$targets" ] || log "대상 클라이언트 없음 (attach 된 클라이언트가 없거나 tmux 에 못 닿음)"
+else
+	targets=/dev/tty # tmux 밖(일반 ssh 셸의 pbcopy alias 등)
 fi
 
-# Nothing to copy — abort without clobbering the clipboard.
-[ -n "$raw" ] || exit 0
+emit() { { printf '\033]52;c;%s\007' "$1" >"$2"; } 2>/dev/null; }
 
-# mosh 1.4.0 requires 'c;' selection prefix; also accepted by Ghostty/xterm.
-buf=$(printf '%s' "$raw" | base64 | tr -d '\r\n')
+sig=$(printf '%s' "$buf" | cksum | awk '{print $1 "-" $2}')
+for t in $targets; do
+	key=$(basename "$t")
+	last=$(cat "$STATE_DIR/last-$key" 2>/dev/null || :)
+	if [ "$last" = "$sig" ]; then
+		decoy=$({ cat "$tmp"; printf ' '; } | base64 | tr -d '\r\n')
+		emit "$decoy" "$t" && sleep "$DECOY_WAIT"
+		log "같은 내용 재복사 → 상태를 바꾸려 먼저 한 번 더 보냄 ($key)"
+	fi
+	if emit "$buf" "$t"; then
+		mkdir -p "$STATE_DIR" 2>/dev/null && printf '%s\n' "$sig" >"$STATE_DIR/last-$key" 2>/dev/null || :
+	else
+		log "tty 쓰기 실패 $t"
+	fi
+done
 
-# Find the most-recently-active client attached to this pane's session.
-# #{client_activity} is a Unix timestamp — higher means more recent keyboard
-# activity, which reliably identifies the user's foreground session even
-# when multiple clients are attached (stale ssh, headless mosh-server, ...).
-session=$(tmux display-message -p '#{session_name}' 2>/dev/null || printf '')
-target_tty=''
-if [ -n "$session" ]; then
-  target_tty=$(tmux list-clients -t "$session" \
-    -F '#{client_activity} #{client_tty}' 2>/dev/null \
-    | sort -rn | head -n1 | awk '{print $2}')
-fi
-
-# Write OSC 52 directly to the client's outer tty.
-# Ghostty receives it (clipboard-write = allow) and updates the macOS pasteboard.
-if [ -n "$target_tty" ] && [ -w "$target_tty" ]; then
-  printf '\033]52;c;%s\007' "$buf" > "$target_tty" 2>/dev/null || true
-fi
-
-# Also set local macOS clipboard for direct (non-mosh, non-ssh) tmux sessions.
-# No-op on Linux (pbcopy absent).
-command -v pbcopy >/dev/null 2>&1 && printf '%s' "$raw" | pbcopy 2>/dev/null || true
+# 서버 맥 자신의 클립보드에도 둔다(옛 동작 유지). pbcopy 가 없는 Linux 에선 건너뛴다.
+command -v pbcopy >/dev/null 2>&1 && pbcopy <"$tmp" 2>/dev/null || :
+exit 0

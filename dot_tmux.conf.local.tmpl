@@ -295,18 +295,23 @@ set -g allow-passthrough on
 
 # OSC 52 clipboard via direct-write to client TTY (mosh-compatible, both OS)
 #
-# Problem: tmux 3.6a's built-in set-clipboard emits OSC 52 but mosh clients
-# never receive it — tmux writes OSC 52 to its own controlling terminal,
-# which (inside a mosh session) is the mosh-server's internal pty, not the
-# outer pty that mosh forwards to the client. DCS passthrough via pane_tty
-# has the same failure mode. Empirically confirmed on tmux 3.6a + mosh 1.4.0.
-# Cross-reference: https://github.com/mobile-shell/mosh/pull/1104 (delbao 2022).
+# Problem: tmux's built-in set-clipboard emits `ESC ] 52 ; ; <b64>` (empty
+# selection parameter) and mosh 1.4.0 only forwards `52;c;…` — so over mosh the
+# built-in path silently drops everything (terminalfunctions.cc OSC_dispatch).
 #
-# Solution: the tmux-osc52-copy script writes OSC 52 directly to the most-
-# recently-active client's #{client_tty}. For a mosh session that pty IS the
-# one mosh forwards to the client Ghostty — OSC 52 reaches the outer terminal
-# cleanly. Works identically for local (non-mosh) tmux sessions.
+# Solution: the tmux-osc52-copy script builds `52;c;…` itself and writes it
+# directly to the most-recently-active client's #{client_tty} (for a mosh
+# session that pty IS the one mosh forwards to Ghostty). Works identically for
+# local (non-mosh) tmux sessions.
+#
+# EVERY copy path must go through the script, or the Mac clipboard "sometimes"
+# stays untouched (2026-11-23): copy-command covers tmux's default bindings
+# (double/triple click, C-j, D, ...) and the three bindings below pass the script
+# explicitly. The script also revives a deleted tmux socket (macOS tmp_cleaner)
+# and works around mosh dropping a repeated identical clipboard value — see its
+# header. Prevention of the socket deletion: tmux-socket-guard (LaunchAgent).
 set -s set-clipboard off
+set -s copy-command 'tmux-osc52-copy'
 
 # Clean stale env vars from previous terminal (iTerm2 remnants in tmux server)
 set-environment -g -u ITERM_PROFILE
@@ -408,14 +413,15 @@ bind-key -n M-k if-shell "$is_vim" 'send-keys M-k'  'select-pane -U'
 bind-key -n M-l if-shell "$is_vim" 'send-keys M-l'  'select-pane -R'
 
 # OSC 52 clipboard via direct client-TTY write (mosh-compatible, both OS)
-# Override copy-mode bindings to use the tmux-osc52-copy script, which
-# writes raw OSC 52 directly to the most-recently-active client's #{client_tty}.
-# This bypasses tmux's broken-over-mosh built-in set-clipboard and also the
-# pane_tty DCS-passthrough dead-end (see clipboard section earlier in this file).
+# Override copy-mode bindings to pipe the selection (stdin) to the tmux-osc52-copy
+# script, which writes `52;c;…` directly to the most-recently-active client's
+# tty. copy-pipe-and-cancel also fills the tmux paste buffer, so the script needs
+# no tmux round-trip for the data (the old copy-selection + run-shell + save-buffer
+# chain died silently whenever the tmux socket was gone).
 # Also calls pbcopy for local macOS sessions as a fallback (no-op on Linux).
-bind -T copy-mode-vi y send-keys -X copy-selection-and-cancel \; run-shell -b 'tmux-osc52-copy'
-bind -T copy-mode-vi Enter send-keys -X copy-selection-and-cancel \; run-shell -b 'tmux-osc52-copy'
-bind -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection-and-cancel \; run-shell -b 'tmux-osc52-copy'
+bind -T copy-mode-vi y send-keys -X copy-pipe-and-cancel 'tmux-osc52-copy'
+bind -T copy-mode-vi Enter send-keys -X copy-pipe-and-cancel 'tmux-osc52-copy'
+bind -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel 'tmux-osc52-copy'
 
 # OpenCode TUI compose popup (prefix + e)
 # Opens nvim in a centered popup (95% x 50%) for multi-line input composition,
