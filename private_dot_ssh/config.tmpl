@@ -12,8 +12,15 @@ Host m4 studio-th oldmac
     HostName 100.78.251.64
     User owen
 
-{{ if eq .chezmoi.hostname "Owenui-Macmini" -}}
-# m4 에서 서버(M6)로 — 2026-10-03 맥 이관 때 m4 에 손으로 넣었던 블록(손으로 둔 블록은 chezmoi apply 가 지운다, 2026-10-20 템플릿으로 옮김).
+# 2026-11-25 Owen: 맥북프로(M6) = mbp — 주력 노트북 · 편집 자동화 손 수정 전용 맥 · 캡컷 병렬 맥 · 촬영 맥.
+# 내부망 주소는 DHCP 라 바뀔 수 있다 — tailnet 로그인 뒤 tailnet IP 로 고정한다(그 전엔 Bonjour 이름).
+Host mbp
+    HostName owen-mbp.local
+    User owen
+
+{{ if has .chezmoi.hostname (list "Owenui-Macmini" "owen-mbp") -}}
+# m4·맥북프로에서 서버(M6)로 — 2026-10-03 맥 이관 때 m4 에 손으로 넣었던 블록(손으로 둔 블록은 chezmoi apply 가 지운다, 2026-10-20 템플릿으로 옮김).
+# 2026-11-25 맥북프로도 — 촬영 키트 automation_pause.sh 가 studio-kr 로 접속한다.
 # HostKeyAlias = m4 known_hosts 에 이 이름으로 저장된 서버 키.
 Host studio-kr
     HostName 100.74.65.14
