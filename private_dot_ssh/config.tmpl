@@ -13,9 +13,10 @@ Host m4 studio-th oldmac
     User owen
 
 # 2026-11-25 Owen: 맥북프로(M6) = mbp — 주력 노트북 · 편집 자동화 손 수정 전용 맥 · 캡컷 병렬 맥 · 촬영 맥.
-# 내부망 주소는 DHCP 라 바뀔 수 있다 — tailnet 로그인 뒤 tailnet IP 로 고정한다(그 전엔 Bonjour 이름).
+# tailnet IP 로 고정(11-25 관리자 승인 · tailnet 이름 mbp) — 내부망 주소는 DHCP 라 바뀔 수 있고, 사무실 공유기가 *.local 을
+# 공인 주소로 잘못 답해 Bonjour 이름(owen-mbp.local)은 시간 초과였다. 사무실 안에선 Tailscale 이 내부망으로 직결한다.
 Host mbp
-    HostName owen-mbp.local
+    HostName 100.90.60.106
     User owen
 
 {{ if has .chezmoi.hostname (list "Owenui-Macmini" "owen-mbp") -}}
